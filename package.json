@@ -1,0 +1,13 @@
+{
+  "name": "playwright-recorder",
+  "version": "1.0.0",
+  "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
+  "main": "index.js",
+  "repository": "https://github.com/dnvgl/playwright-recorder",
+  "author": "DNV",
+  "license": "MIT",
+  "private": false,
+  "devDependencies": {
+    "@playwright/test": "^1.22.2"
+  }
+}
