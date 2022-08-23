@@ -1,13 +1,18 @@
 {
-  "name": "playwright-recorder",
+  "name": "@dnv/playwrightrecorder",
   "version": "1.0.0",
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
-  "main": "index.js",
-  "repository": "https://github.com/dnvgl/playwright-recorder",
+  "main": "dist/PlaywrightRecorder.js",
+  "repository": "https://github.com/dnvgl/PlaywrightRecorder",
   "author": "DNV",
   "license": "MIT",
   "private": false,
+  "scripts": {
+    "build": "tslint -p . && tsc"
+  },
   "devDependencies": {
-    "@playwright/test": "^1.22.2"
+    "@playwright/test": "^1.22.2",
+    "tslint": "^6.1.3",
+    "typescript": "^4.7.4"
   }
 }

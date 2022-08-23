@@ -1,0 +1,14 @@
+{
+    "defaultSeverity": "off",
+    "jsRules": {
+    },
+    "rules": {
+        "no-floating-promises": {
+            "severity": "error"
+        },
+        "no-unbound-method": {
+            "severity": "error"
+        }
+    },
+    "rulesDirectory": []
+}
