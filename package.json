@@ -3,7 +3,7 @@
   "type":"commonjs",
   "version": "1.0.0",
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
-  "main": "dist/PlaywrightRecorder.js",
+  "main": "dist/playwright-recorder.js",
   "files": ["dist/**/*.*"],
   "repository": "https://github.com/dnvgl/playwright-recorder",
   "author": "DNV",
