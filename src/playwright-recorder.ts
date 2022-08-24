@@ -6,7 +6,7 @@ export module PlaywrightRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
         recorderRulesPath: './src/recorderRules.js',
-        browserCodePath: './node_modules/@dnv/playwright-recorder/dist/browserCode.js'
+        browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js'
     }
     
     var lastCommand: string = '';
