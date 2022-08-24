@@ -1,0 +1,37 @@
+# Node.js with Vue
+# Build a Node.js project that uses Vue.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+variables:
+- group: tool-versions
+
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- checkout: self
+  persistCredentials: true
+  clean: true
+
+- script: |
+    dotnet tool install --global GitVersion.Tool --version $(gitversion-version)
+  displayName: 'Install gitversion'
+
+- script: |
+    GitVersion_SemVer=`dotnet-gitversion /showvariable SemVer`
+    npm version $GitVersion_SemVer --no-git-tag-version
+    echo "##vso[build.updatebuildnumber]$GitVersion_SemVer"
+  displayName: 'npm version'
+
+- script: |
+    yarn install
+  displayName: 'yarn install'
+
+# Publish to Azure DevOps feed
+- script: |
+    npm publish
+  displayName: 'npm publish'
