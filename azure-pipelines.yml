@@ -31,6 +31,10 @@ steps:
     yarn install
   displayName: 'yarn install'
 
+- script: |
+    yarn pack
+  displayName: 'yarn pack'
+
 # Publish to Azure DevOps feed
 - script: |
     npm publish
