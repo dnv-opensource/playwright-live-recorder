@@ -9,3 +9,6 @@ todo: add usage examples and gifs
 ## Features
 
 todo: add features list
+
+## Technical Implementation
+![](diagram.png "Playwright Live Recorder diagram")

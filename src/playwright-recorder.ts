@@ -8,10 +8,26 @@ export module PlaywrightRecorder {
         recorderRulesPath: './src/recorderRules.js',
         browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js'
     }
+
+    export async function startLiveCoding(page: Page) {
+        if (process.env.TestingContext_isHeadless == 'true') {
+            console.error('startLiveCoding called while running headless');
+            return;
+        }
+
+        //get stacktrace to find startLiveCoding calling location (file and line)
+        const callingLocationStr = new Error().stack!.split('\n')[2]; //line 0,1,2 2 is the immediate calling location of startLiveCoding
+        const fileAndLineRegex = /    at (.+):(\d+):\d+/.exec(callingLocationStr)!;
+        const testCallingLocation = { file: fileAndLineRegex[1], line: +fileAndLineRegex[2] };
+        
+        //todo: figure out how to log a step to show the 'live coding' is being attached
+        await init(page, testCallingLocation);
+        await page.waitForEvent("close", {timeout: 1000 * 60 * 60});
+    }
     
     var lastCommand: string = '';
     var commandLineCount = 0;
-
+    
     async function init(page: Page, testCallingLocation: {file: string, line: number}) {
         await page.exposeFunction('PW_eval', (testEval: string, record = false) => TestingContext_eval(testCallingLocation, page, testEval, record));
 
@@ -32,22 +48,6 @@ export module PlaywrightRecorder {
         //(async () => { for await (const event of fs.watch(config.browserCodePath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodePath}) : {}; })();
         // uncomment line above if live reloading of browserCode.js needed
         
-    }
-
-    export async function startLiveCoding(page: Page) {
-        if (process.env.TestingContext_isHeadless == 'true') {
-            console.error('startLiveCoding called while running headless')
-            return;
-        }
-
-        //get stacktrace to find startLiveCoding calling location (file and line)
-        const callingLocationStr = new Error().stack!.split('\n')[2]; //line 0,1,2 2 is the immediate calling location of startLiveCoding
-        const fileAndLineRegex = /    at (.+):(\d+):\d+/.exec(callingLocationStr)!;
-        const testCallingLocation = { file: fileAndLineRegex[1], line: +fileAndLineRegex[2] };
-        
-        //todo: figure out how to log a step to show the 'live coding' is being attached
-        await init(page, testCallingLocation);
-        await page.waitForEvent("close", {timeout: 1000 * 60 * 60});
     }
 
     async function TestingContext_eval(testCallingLocation: {file: string, line: number}, page: Page, testEval: string, record = true, commandToOverwrite: string|undefined = undefined) {

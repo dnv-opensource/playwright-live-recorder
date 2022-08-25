@@ -2,6 +2,14 @@ import('https://medv.io/finder/finder.js').then(m => window.finder = m.finder);
 var $ = document.querySelector.bind(document);
 var $$ = document.querySelectorAll.bind(document);
 
+/**
+ * RecorderRules contract:
+ * array of { match(el) => resultType | undefined, output(x: matchType) => code: string}
+ * notes: 
+ *   match(el) => undefined inidicates not a match
+ *   rules are evaluated in order (top to bottom)
+ *   currently hovered element is passed into each match
+ */
 var RecorderRules = [
     {
         match: (el) => [...$$('.nav-link')].includes(el) ? `.nav-link:has-text("${el.text}")` : undefined,

@@ -56,13 +56,6 @@ function keyChord_click_eval(event) {
     window.PW_eval(result.output, true);
 }
 
-window.addEventListener ("keydown", keyChord_showTooltip);
-window.addEventListener('mousemove', keyChord_mousemove_updateTooltip);
-window.addEventListener('click', keyChord_click_eval, true);
-window.addEventListener ("keyup", keyChordUp_hideTooltip);
-
-window.addEventListener ("keydown", keyChord_lastCommandRepl, true);
-
 function keyChord_lastCommandRepl(event) {
     if (event.ctrlKey && event.altKey && event.shiftKey) {
         if(event.key == ' ') {
@@ -85,3 +78,10 @@ document.PW_getRuleForElement = function(el) {
     const match = RecorderRules.find(i => { matcher = i.match(el); return matcher !== undefined; });
     return { matcher, output: match.output(matcher) };
 }
+
+window.addEventListener('keydown', keyChord_showTooltip);
+window.addEventListener('mousemove', keyChord_mousemove_updateTooltip);
+window.addEventListener('click', keyChord_click_eval, true);
+window.addEventListener('keyup', keyChordUp_hideTooltip);
+
+window.addEventListener('keydown', keyChord_lastCommandRepl, true);
