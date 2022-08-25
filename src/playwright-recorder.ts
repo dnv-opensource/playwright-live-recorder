@@ -1,12 +1,21 @@
 import { Page, test } from "@playwright/test";
 import * as fs from "fs/promises";
-
+import * as chokidar from "chokidar";
 
 export module PlaywrightRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
         recorderRulesPath: './src/recorderRules.js',
         browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
+        pageObjectModel: {
+            path: './src/page-object-models/',
+            filenameConvention: '**/*_page.ts',
+            baseUrl: test.info().config.projects[0].use.baseURL!, //hack: using projects[0] since can't find 'use.*' otherwise
+            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), ''), //strip the baseUrl
+            propertySelectorConvention: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
+            //todo: strip numeric id and guids from url
+            //todo: strip query parameters from url
+        }
     }
 
     /**
@@ -26,7 +35,8 @@ export module PlaywrightRecorder {
 
         //todo: figure out how to log a step to show the 'live coding' is being attached
         await init(page, testCallingLocation, evalScope);
-        await page.waitForEvent("close", {timeout: 1000 * 60 * 60});
+        await scanAndLoadPageObjectModels(page);
+        await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
     var lastCommand: string = '';
@@ -51,6 +61,24 @@ export module PlaywrightRecorder {
         // tslint:disable-next-line: no-floating-promises
         //(async () => { for await (const event of fs.watch(config.browserCodePath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodePath}) : {}; })();
         // uncomment line above if live reloading of browserCode.js needed
+    }
+
+    async function scanAndLoadPageObjectModels(page: Page) {
+        const watch = chokidar.watch(`${config.pageObjectModel.path}${config.pageObjectModel.filenameConvention}`);
+        watch.on('add', path => reloadPageObjectModel(page, path)); //todo: filter by lookupPaths
+        watch.on('change', path => reloadPageObjectModel(page, path)); //todo: filter by lookupPaths
+        //todo: figure out cleanup of the watcher. Assume current test task being ended is enough.
+
+        const allFiles = watch.getWatched();
+        console.log('todo: iterate and init load all watched page files', { allFiles });
+    }
+
+    async function reloadPageObjectModel(page: Page, path: string) {
+        const i = import(path);
+        //todo: iterate i to find class in file
+        //reflect across i class, get all properties that match 
+
+        await page.addScriptTag({ path });
     }
 
     async function TestingContext_eval(testCallingLocation: { file: string, line: number }, evalScope: (s:string) => any, page: Page, testEval: string, record = true, commandToOverwrite: string | undefined = undefined) {
