@@ -70,6 +70,11 @@ export module PlaywrightRecorder {
                 await page.evaluate(`console.error(\`non-standard error. See DEBUG CONSOLE in test execution environment for details\`);`); //todo: toast message instead
                 console.error(error);
             }
+
+            if (record) {
+                await recordLineToTestFile(testCallingLocation, `//${testEval} // failed to execute`, commandToOverwrite);
+                commandLineCount += testEval.split('\n').length;
+            }
         }
     }
 
