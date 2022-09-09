@@ -94,12 +94,19 @@ export module PlaywrightRecorder {
 
     async function TestingContext_eval(testCallingLocation: { file: string, line: number }, evalScope: (s:string) => any, page: Page, testEval: string, record = true, commandToOverwrite: string | undefined = undefined) {
         try {
-            const s = testEval.replace(/^await /, '');
-            await evalScope(s);
-            lastCommand = testEval;
+            const s = testEval.replaceAll(/\bawait\b/g, ''); //hack - eval doesn't play well with awaits, ideally we'd transpile it into promises... but I don't know how to use `typescript` lib to do this
+            //prepend imports from local test file into eval scope
+            const testFileSource = await fs.readFile(testCallingLocation.file, 'utf-8');
+            //ts.transpile(testFileSource) //todo: figure out how to use typescript to transpile `import` into `require` syntax
+            const importToRequireRegex = /\bimport\b\s*({?\s*[^}]+}?)\s*from\s*([^;]*);?/g;  
+            const matches = [...testFileSource.matchAll(importToRequireRegex)];
+            const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
+          
+            await evalScope(`${imports}\n${s}`);
             if (record) {
                 await recordLineToTestFile(testCallingLocation, testEval, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
+                lastCommand = testEval;
             }
         } catch (error) {
             if (error instanceof Error) {
@@ -113,6 +120,7 @@ export module PlaywrightRecorder {
             if (record) {
                 await recordLineToTestFile(testCallingLocation, `//${testEval} // failed to execute`, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
+                lastCommand = testEval;
             }
         }
     }
