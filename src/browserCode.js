@@ -124,12 +124,15 @@ window.addEventListener('DOMContentLoaded', () => page_object_model_elements_loa
 var $ = document.querySelector.bind(document);
 var $$ = document.querySelectorAll.bind(document);
 
-function load_page_object_model_elements() {
+async function load_page_object_model_elements() {
+    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
     page_object_model_elements_loaded = true;
     //todo: get current page object to reflect across
     
-    const pageObject = textinput_page; //hack, hardcoded
+    const pageObjectName = await PW_urlToFilePath(window.location.href);
+    const pageObject = window[pageObjectName];
+    if (pageObject === undefined) return;
 
     for (var prop in pageObject) {
         if (!prop.endsWith('_selector')) continue;
@@ -148,7 +151,7 @@ function load_page_object_model_elements() {
         const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
         const selectorMethod = '' + pageObject[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-        overlayEl.setAttribute('data-page-object-model', `textinput_page.${selectorMethodName}${selectorMethodArgs}`);
+        overlayEl.setAttribute('data-page-object-model', `${pageObjectName}.${selectorMethodName}${selectorMethodArgs}`);
 
         //todo: extract into css style
         overlayEl.style.position = 'absolute';

@@ -12,7 +12,7 @@ export module PlaywrightRecorder {
             path: './src/page-object-models/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string|undefined>undefined,
-            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), ''), //strip the baseUrl
+            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page', //strip the baseUrl
             propertySelectorConvention: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
             //todo: strip numeric id and guids from url
             //todo: strip query parameters from url
@@ -51,6 +51,8 @@ export module PlaywrightRecorder {
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await TestingContext_eval(testCallingLocation, evalScope, page, testEval, true, lastCommand));
 
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(matcherCode));
+        
+        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.pageObjectModel.urlToFilePath(url));
 
         await page.addScriptTag({ path: config.recorderRulesPath });
         await page.addScriptTag({ path: config.browserCodePath });
