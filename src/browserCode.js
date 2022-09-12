@@ -74,6 +74,7 @@ function keyChord_mousemove_updateTooltip(event) {
     updateTooltipPosition(mouse_x, mouse_y);
     
     const element = document.elementFromPoint(mouse_x, mouse_y);
+    if (element == null) return;
     if (window.el === element) return;
 
     updateTooltipContents(element);
