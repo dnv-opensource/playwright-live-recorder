@@ -9,13 +9,12 @@ export module PlaywrightRecorder {
         recorderRulesPath: './src/recorderRules.js',
         browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
         pageObjectModel: {
+            enabled: true,
             path: './src/page-object-models/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string|undefined>undefined,
-            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page', //strip the baseUrl
-            propertySelectorConvention: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
-            //todo: strip numeric id and guids from url
-            //todo: strip query parameters from url
+            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
+            propertySelectorRegex: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
         }
     }
 
@@ -37,7 +36,7 @@ export module PlaywrightRecorder {
 
         //todo: figure out how to log a step to show the 'live coding' is being attached
         await init(page, testCallingLocation, evalScope);
-        await scanAndLoadPageObjectModels(page);
+        if (config.pageObjectModel.enabled) await scanAndLoadPageObjectModels(page);
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
@@ -53,6 +52,16 @@ export module PlaywrightRecorder {
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(matcherCode));
         
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.pageObjectModel.urlToFilePath(url));
+        await page.exposeFunction('PW_config', () => {
+            //shenanigans to get regexp and functions to serialize reasonably
+            (<any>RegExp.prototype).toJSON = RegExp.prototype.toString;
+            (<any>Function.prototype).toJSON = Function.prototype.toString;
+            const result = JSON.stringify(config);
+            delete (<any>RegExp.prototype).toJSON;
+            delete (<any>Function.prototype).toJSON;
+          
+            return JSON.parse(result);
+        });
 
         await page.addScriptTag({ path: config.recorderRulesPath });
         await page.addScriptTag({ path: config.browserCodePath });
@@ -87,7 +96,7 @@ export module PlaywrightRecorder {
             .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`)
             .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, `window.${className} = ${className};`)
             //export module fixup
-            .replace(`export var ${className};`, `window.${className} = ${className};`)
+            .replace(`export var ${className};`, `window.PW_pages.${className} = ${className};`)
 
         await page.addScriptTag({ content });
     }

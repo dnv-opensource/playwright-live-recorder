@@ -19,51 +19,83 @@ console.log('tip - hover over text objects with \\n in them to see formatted tex
 
 var PW_tooltip = document.createElement("div");
 PW_tooltip.setAttribute('id', 'PW_tooltip');
-PW_tooltip.style = 'position:absolute; left:0; top:0; padding:4px; background:LavenderBlush; outline:1px solid black; border-radius:4px;z-index:2147483647; visibility:hidden';
+PW_tooltip.classList.add('PW-tooltip');
 document.body.appendChild(PW_tooltip);
 window.PW_tooltip = PW_tooltip;
 
-function keyChord_showTooltip(event) {
-    if (event.ctrlKey && event.altKey && event.shiftKey) window.PW_tooltip.style.visibility = 'visible'; //todo: re-calc hover element and tooltip
+var mouse_x = 0;
+var mouse_y = 0;
+
+var recordModeOn = false;
+PW_config().then(c => window.config = c);
+
+function keyChord_toggleRecordMode(event) {
+    if (!(event.ctrlKey && event.altKey && event.shiftKey)) return;
+
+    toggleRecordMode();
 }
 
-function keyChordUp_hideTooltip(event) {
-    if (event.ctrlKey || event.altKey || event.shiftKey) window.PW_tooltip.style.visibility = 'hidden';
+function toggleRecordMode() {
+    recordModeOn = !recordModeOn;
+
+    if (recordModeOn) {
+        updateTooltipPosition(mouse_x, mouse_y);
+        const element = document.elementFromPoint(mouse_x, mouse_y);
+        updateTooltipContents(element);
+        window.PW_tooltip.style.visibility = 'visible';
+        if(config.pageObjectModel.enabled) {
+            reload_page_object_model_elements();
+            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'visible';
+        }
+    } else {
+        window.PW_tooltip.style.visibility = 'hidden';
+        if(config.pageObjectModel.enabled) {
+            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'hidden';
+        }
+    }
+}
+
+function updateTooltipContents(element) {
+    const rule = document.PW_getRuleForElement(element);
+    const matcher = rule.match(element);
+    PW_tooltip.innerText = typeof matcher === 'string' ? matcher : JSON.stringify(matcher, undefined, '\t');
+}
+
+function updateTooltipPosition(x,y) {
+    PW_tooltip.style.left = x + 'px';
+    PW_tooltip.style.top = y + 16 + 'px';
 }
 
 function keyChord_mousemove_updateTooltip(event) {
-    if (!(event.altKey && event.ctrlKey && event.shiftKey)) return;
-    window.PW_tooltip.style.left = event.x + 'px';
-    window.PW_tooltip.style.top = event.y + 16 + 'px';
+    mouse_x = event.x;
+    mouse_y = event.y;
+    if (!recordModeOn) return;
+
+    updateTooltipPosition(mouse_x, mouse_y);
     
-    const element = document.elementFromPoint(event.x, event.y);
+    const element = document.elementFromPoint(mouse_x, mouse_y);
     if (window.el === element) return;
 
+    updateTooltipContents(element);
     window.el = element;
-
-    const rule = document.PW_getRuleForElement(element);
-    const matcher = rule.match(element);
-    window.PW_tooltip.innerText = typeof matcher === 'string' ? matcher : JSON.stringify(matcher, undefined, '\t');
 }
 
-function keyChord_click_eval(event) {
-    if (!(event.altKey && event.ctrlKey && event.shiftKey)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const element = document.elementFromPoint(event.x, event.y);
+var handlingClick = false;
+async function recordModeClickHandler(event) {
+    if (!recordModeOn) return;
+    if (handlingClick) return;
+    try {
+        handlingClick = true;
 
-    const result = document.PW_getRuleForElement(element);
-    if (result.onClick) result.onClick(element);
-    window.PW_eval(result.output(result.match(element)), true);
-}
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const element = document.elementFromPoint(event.x, event.y);
 
-function keyChord_lastCommandRepl(event) {
-    if (event.ctrlKey && event.altKey && event.shiftKey) {
-        if (event.key == ' ') {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            lastCommandRepl();
-        }
+        const result = document.PW_getRuleForElement(element);
+        if (result.onClick) result.onClick(element);
+        await window.PW_eval(result.output(result.match(element)), true);
+    } finally {
+        handlingClick = false;
     }
 }
 
@@ -74,72 +106,58 @@ async function lastCommandRepl() {
     PW_updateAndRerunLastCommand(updatedCommand);
 }
 document.PW_getRuleForElement = function (el) {
-    return RecorderRules.find(i => i.match(el) !== undefined);
+    return RecorderRules.find(i => i.match(el) != null /* null or undefined */);
 };
-window.addEventListener('keydown', keyChord_showTooltip);
+window.addEventListener('keydown', keyChord_toggleRecordMode);
 window.addEventListener('mousemove', keyChord_mousemove_updateTooltip);
-window.addEventListener('click', keyChord_click_eval, true);
-window.addEventListener('keyup', keyChordUp_hideTooltip);
-window.addEventListener('keydown', keyChord_lastCommandRepl, true);
+window.addEventListener('click', recordModeClickHandler, true);
 
 
 
-/* page object model feature */
+/******** styles ********/
+const style = document.createElement('style');
+document.head.appendChild(style);
+style.sheet.insertRule(`.PW-tooltip {
+    position:absolute;
+    left:0;
+    top:0;
+    padding:4px;
+    background:LavenderBlush;
+    outline:1px solid black;
+    border-radius:4px;
+    z-index:2147483647;
+    visibility:hidden;
+}`);
 
-function page_object_model_keyChord(event) { return event.ctrlKey && !event.altKey && event.shiftKey; }
-
-function page_object_model_keyChordDown(event) {
-    if (!page_object_model_keyChord(event)) return;
-    if (page_object_model_elements_loaded === false) load_page_object_model_elements();
-    for (const el of window.PW_overlays) el.style.visibility = 'visible';
-}
-
-function page_object_model_keyChordUp(event) {
-    if (event.ctrlKey || event.shiftKey) {
-        window.PW_tooltip.style.visibility = 'hidden';
-    }
-}
-
-function page_object_model_keyChord_mousemove(event) {
-    if (!(event.ctrlKey && !event.altKey && event.shiftKey))
-        return;
-    window.PW_tooltip.style.left = event.x + 'px';
-    window.PW_tooltip.style.top = event.y + 16 + 'px';
-    const element = document.elementFromPoint(event.x, event.y);
-    if (window.el === element)
-        return;
-    window.el = element;
-    const rule = document.PW_getRuleForElement(element);
-    window.PW_tooltip.innerText = typeof rule.matcher === 'string' ? rule.matcher : JSON.stringify(rule.matcher, undefined, '\t');
-}
-
-window.addEventListener('keydown', page_object_model_keyChordDown);
-window.addEventListener('keyup', page_object_model_keyChordUp);
-window.addEventListener('mousemove', page_object_model_keyChord_mousemove);
-
-var page_object_model_elements_loaded = false;
-window.addEventListener('DOMContentLoaded', () => page_object_model_elements_loaded = false);
+style.sheet.insertRule(`.PW-page-object-model-overlay {
+    position: absolute;
+    background-color: #ff8080;
+    opacity: 0.7;
+}`); //todo: add border, z-index
 
 
-var $ = document.querySelector.bind(document);
-var $$ = document.querySelectorAll.bind(document);
+/******** page object model feature ********/
 
-async function load_page_object_model_elements() {
+var pageObjectName = '';
+
+async function reload_page_object_model_elements() {
+    //var $ = document.querySelector.bind(document);
+    var $$ = document.querySelectorAll.bind(document);
+
     if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
-    page_object_model_elements_loaded = true;
-    //todo: get current page object to reflect across
     
-    const pageObjectName = await PW_urlToFilePath(window.location.href);
+    //get current page object to reflect across
+    pageObjectName = await PW_urlToFilePath(window.location.href);
     const pageObject = window[pageObjectName];
     if (pageObject === undefined) return;
 
+    const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
     for (var prop in pageObject) {
-        if (!prop.endsWith('_selector')) continue;
+        if (!propertyRegex.test(prop)) continue;
 
         const selector = pageObject[prop];
         const el = $$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
-        //el.style.position = 'absolute'; //is this necessary?
 
         const rect = el.getBoundingClientRect();
         const overlayEl = document.createElement('div');
@@ -147,6 +165,8 @@ async function load_page_object_model_elements() {
         overlayEl.style.left = rect.left + 'px';
         overlayEl.style.width = rect.width + 'px';
         overlayEl.style.height = rect.height + 'px';
+        //todo: add listener on source element to modify size/position
+
         //todo: use a regex instead
         const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
         const selectorMethod = '' + pageObject[selectorMethodName].toString();
@@ -154,12 +174,7 @@ async function load_page_object_model_elements() {
         overlayEl.setAttribute('data-page-object-model', `${pageObjectName}.${selectorMethodName}${selectorMethodArgs}`);
 
         //todo: extract into css style
-        overlayEl.style.position = 'absolute';
-        overlayEl.style['background-color'] = '#ff8080';
-        overlayEl.style.opacity = '0.7';
-        overlayEl.addEventListener('click', () => overlayEl.style.visibility = 'hidden');
-        //todo: add border
-        //todo: z-index and disable hit test
+        overlayEl.classList.add('PW-page-object-model-overlay');
         el.insertAdjacentElement('afterend', overlayEl);
         window.PW_overlays.push(overlayEl);
     }
