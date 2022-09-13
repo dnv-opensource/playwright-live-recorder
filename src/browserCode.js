@@ -1,21 +1,22 @@
-console.log('Playwright live coder and configurable recorder, expand for usage details', {
-    '1. to preview step': 'hold key chord CTRL+SHIFT+ALT and hover over element',
-    '2. to record step': 'hold key chord CTRL+SHIFT+ALT and left mouse click on element',
-    '3. to modify last step': 'hold key chord CTRL+SHIFT+ALT and press SPACE',
-    '3a. tips': 'use // to add comment, or comment out whole step. Clicking OK will re-run the modified step',
-    '4. to author a new recorder rule': 'hold key chord while hovering over element, use console to develop new matcher using variable `el` and fns `$` and `$$` and any other libs referenced in recorderRules. copy+paste working matcher and run PW_addRule(`<string here>`)',
-    '5. new recorder rule details': {
-        'a. example rule': "`[...$$('.nav-link')].includes(el) ? \\\`.nav-link:has-text(\"${el.text}\")\\\` : undefined",
-        'b. example rule will generate code': `    {
-        match: (el) => [...$$('.nav-link')].includes(el) ? \`.nav-link:has-text(\"\${el.text}\")\` : undefined,
-        output: (selector) => \`await page.locator('\${selector}').click();\`
-    },`,
-        'c. to add this rule, run': `PW_addRule(\`[...$$('.nav-link')].includes(el) ? \\\`.nav-link:has-text(\"\${el.text}\")\\\` : undefined\`)`
-    },
-    '6. to live code': 'call PW_eval(`await page.<whatever lines you want to execute here`)',
-    '6a. to record live code step': 'call PW_eval(`await page.<whatever lines you want to execute here`, true)'
-});
-console.log('tip - hover over text objects with \\n in them to see formatted text');
+/******** UI Elements ********/
+
+window.PW_statusbar = document.createElement("div");
+PW_statusbar.classList.add('PW-statusbar');
+window.PW_statusbar_recordToggleBtn = document.createElement("button");
+PW_statusbar_recordToggleBtn.innerHTML = `<button class="PW_statusbar-item" title="Click to toggle on Record Mode" onclick="toggleRecordMode()">⬤</button>`;
+window.PW_statusbar_repl = document.createElement("input");
+PW_statusbar_repl.innerHTML = `<input style="PW_statusbar-item" placeholder="last executed line (modify and press enter to re-evaluate)"></input>`;
+window.PW_statusbar_pageObjectModelName = document.createElement("span");
+PW_statusbar_pageObjectModelName.innerHTML = `<span class="PW-statusbar-item" title="page object model filename"></span>`;
+window.PW_statusbar_title = document.createElement("span");
+PW_statusbar_title.innerHTML = `<span class="PW-statusbar-item" style="font-size:1.5em; color:rgba(0,0,0,.15)">Playwright Live Recorder</span>`;
+
+PW_statusbar.appendChild(PW_statusbar_title);
+PW_statusbar.appendChild(PW_statusbar_pageObjectModelName);
+PW_statusbar.appendChild(PW_statusbar_repl);
+PW_statusbar.appendChild(PW_statusbar_recordToggleBtn);
+document.body.prepend(PW_statusbar);
+
 
 var PW_tooltip = document.createElement("div");
 PW_tooltip.setAttribute('id', 'PW_tooltip');
@@ -23,6 +24,39 @@ PW_tooltip.classList.add('PW-tooltip');
 document.body.appendChild(PW_tooltip);
 window.PW_tooltip = PW_tooltip;
 
+
+/******** styles ********/
+var style = document.createElement('style');
+document.head.appendChild(style);
+style.sheet.insertRule(`.PW-tooltip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 4px;
+    background: LavenderBlush;
+    outline: 1px solid black;
+    border-radius: 4px;
+    z-index: 2147483647;
+    visibility: hidden;
+}`);
+style.sheet.insertRule(`.PW-page-object-model-overlay {
+    position: absolute;
+    background-color: #ff8080;
+    opacity: 0.7;
+}`); //todo: add border, z-index
+
+style.sheet.insertRule(`.PW-statusbar {
+    position: sticky;
+    border-bottom: 1px solid #A0A0A0;
+    background: rgb(220, 220, 220);
+    display: flex;
+    justify-content: flex-end;
+}`);
+style.sheet.insertRule(`.PW-statusbar-item {
+    display: flex;
+}`);
+
+/******** behavior ********/
 var mouse_x = 0;
 var mouse_y = 0;
 
@@ -39,6 +73,9 @@ function toggleRecordMode() {
     recordModeOn = !recordModeOn;
 
     if (recordModeOn) {
+        PW_statusbar_recordToggleBtn.title = "Recording, click to toggle off"
+        PW_statusbar_recordToggleBtn.style.color = "red";
+
         updateTooltipPosition(mouse_x, mouse_y);
         const element = document.elementFromPoint(mouse_x, mouse_y);
         updateTooltipContents(element);
@@ -48,6 +85,7 @@ function toggleRecordMode() {
             for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'visible';
         }
     } else {
+        PW_statusbar_recordToggleBtn.style.color = "gray";
         window.PW_tooltip.style.visibility = 'hidden';
         if(config.pageObjectModel.enabled) {
             for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'hidden';
@@ -66,14 +104,17 @@ function updateTooltipPosition(x,y) {
     PW_tooltip.style.top = y + 16 + 'px';
 }
 
-function keyChord_mousemove_updateTooltip(event) {
+function mousemove_updateTooltip(event) {
+    const element = document.elementFromPoint(event.x, event.y);
+    if (element == null) return;
+    if (element.closest(".PW-statusbar")) return;
+
     mouse_x = event.x;
     mouse_y = event.y;
     if (!recordModeOn) return;
 
     updateTooltipPosition(mouse_x, mouse_y);
     
-    const element = document.elementFromPoint(mouse_x, mouse_y);
     if (element == null) return;
     if (window.el === element) return;
 
@@ -85,12 +126,16 @@ var handlingClick = false;
 async function recordModeClickHandler(event) {
     if (!recordModeOn) return;
     if (handlingClick) return;
+
+    const element = document.elementFromPoint(event.x, event.y);
+    if (element == null) return;
+    if (element.closest(".PW-statusbar")) return;
+
     try {
         handlingClick = true;
 
         event.preventDefault();
         event.stopImmediatePropagation();
-        const element = document.elementFromPoint(event.x, event.y);
 
         const result = document.PW_getRuleForElement(element);
         if (result.onClick) result.onClick(element);
@@ -110,32 +155,8 @@ document.PW_getRuleForElement = function (el) {
     return RecorderRules.find(i => i.match(el) != null /* null or undefined */);
 };
 window.addEventListener('keydown', keyChord_toggleRecordMode);
-window.addEventListener('mousemove', keyChord_mousemove_updateTooltip);
+window.addEventListener('mousemove', mousemove_updateTooltip);
 window.addEventListener('click', recordModeClickHandler, true);
-
-
-
-/******** styles ********/
-const style = document.createElement('style');
-document.head.appendChild(style);
-style.sheet.insertRule(`.PW-tooltip {
-    position:absolute;
-    left:0;
-    top:0;
-    padding:4px;
-    background:LavenderBlush;
-    outline:1px solid black;
-    border-radius:4px;
-    z-index:2147483647;
-    visibility:hidden;
-}`);
-
-style.sheet.insertRule(`.PW-page-object-model-overlay {
-    position: absolute;
-    background-color: #ff8080;
-    opacity: 0.7;
-}`); //todo: add border, z-index
-
 
 /******** page object model feature ********/
 
@@ -150,6 +171,7 @@ async function reload_page_object_model_elements() {
     
     //get current page object to reflect across
     pageObjectName = await PW_urlToFilePath(window.location.href);
+    PW_statusbar_pageObjectModelName.innerText = pageObjectName;
     const pageObject = window[pageObjectName];
     if (pageObject === undefined) return;
 
