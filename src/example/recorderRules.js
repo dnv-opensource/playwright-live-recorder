@@ -40,5 +40,5 @@ var RecorderRules = [
 function pageObjectModelOnClick(el) {
     const origPointerEvents = el.style.pointerEvents;
     el.style.pointerEvents = 'none'; //make the pageObjectModel custom element not hit test visible
-    setTimeout(() => el.style.pointerEvents = origPointerEvents, 2000); //and then restore it
+    setTimeout(() => el.style.pointerEvents = origPointerEvents, 1000); //and then restore it
 }

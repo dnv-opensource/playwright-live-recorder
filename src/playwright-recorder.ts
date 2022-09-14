@@ -6,7 +6,7 @@ import * as ts from "typescript";
 export module PlaywrightRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
-        recorderRulesPath: './src/recorderRules.js',
+        recorderRulesPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/example/recorderRules.js',
         browserCodeJSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
         browserCodeCSSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.css',
         pageObjectModel: {
