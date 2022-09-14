@@ -7,7 +7,8 @@ export module PlaywrightRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
         recorderRulesPath: './src/recorderRules.js',
-        browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
+        browserCodeJSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
+        browserCodeCSSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.css',
         pageObjectModel: {
             enabled: true,
             path: './src/page-object-models/',
@@ -64,16 +65,19 @@ export module PlaywrightRecorder {
         });
 
         await page.addScriptTag({ path: config.recorderRulesPath });
-        await page.addScriptTag({ path: config.browserCodePath });
+        await page.addScriptTag({ path: config.browserCodeJSPath });
+        await page.addStyleTag({ path: config.browserCodeCSSPath});
 
         page.on('dialog', dialog => {/* allow user interaction for browser interaction with PW_updateAndRunLastCommand */ });
 
-        // tslint:disable-next-line: no-floating-promises
+        // tslint:disable: no-floating-promises
         (async () => { for await (const event of fs.watch(config.recorderRulesPath)) event.eventType === 'change' ? await page.addScriptTag({ path: config.recorderRulesPath }) : {}; })(); //fire-and-forget the watcher
-
-        // tslint:disable-next-line: no-floating-promises
-        //(async () => { for await (const event of fs.watch(config.browserCodePath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodePath}) : {}; })();
-        // uncomment line above if live reloading of browserCode.js needed
+        if ((<any>config).watchLibFiles) {
+            (async () => { for await (const event of fs.watch(config.browserCodeJSPath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodeJSPath}) : {}; })();   //fire-and-forget the watcher
+            (async () => { for await (const event of fs.watch(config.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({path: config.browserCodeCSSPath}) : {}; })();  //fire-and-forget the watcher
+        }
+        // tslint:enable: no-floating-promises
+        
     }
 
     async function scanAndLoadPageObjectModels(page: Page) {

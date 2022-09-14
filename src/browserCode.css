@@ -1,0 +1,52 @@
+.PW-tooltip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 4px;
+    background: LavenderBlush;
+    outline: 1px solid black;
+    border-radius: 4px;
+    z-index: 2147483647;
+    visibility: hidden;
+}
+
+.PW-page-object-model-overlay {
+    position: absolute;
+    background-color: #ff8080;
+    opacity: 0.7;
+    /* todo: add border, z-index */
+}
+
+.PW-statusbar {
+    position: sticky;
+    background: #eee;
+    display: flex;
+}
+
+.PW-statusbar-item {
+    display: flex;
+}
+
+/* checkbox red dot styling */
+.PW-checkbox-recording input[type=checkbox] {
+    visibility: collapse;
+    width: 0;
+    height: 0;
+}
+
+.PW-checkbox-recording label {
+    display: block;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    background: #bbb;
+}
+
+.PW-checkbox-recording input[type=checkbox]:checked+label {
+    background: #d00;
+    box-shadow: 0 0 5px #d00;
+}

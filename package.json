@@ -12,7 +12,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "prepack": "tslint -p . && tsc && cpx \"src/**/*.js\" dist",
+    "prepack": "tslint -p . && tsc && cpx \"src/**/*.{js,css}\" dist",
     "c": "cpx \"src/**/*.js\" dist"
   },
   "devDependencies": {

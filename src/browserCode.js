@@ -2,59 +2,26 @@
 
 window.PW_statusbar = document.createElement("div");
 PW_statusbar.classList.add('PW-statusbar');
-window.PW_statusbar_recordToggleBtn = document.createElement("button");
-PW_statusbar_recordToggleBtn.innerHTML = `<button class="PW_statusbar-item" title="Click to toggle on Record Mode" onclick="toggleRecordMode()">⬤</button>`;
-window.PW_statusbar_repl = document.createElement("input");
-PW_statusbar_repl.innerHTML = `<input style="PW_statusbar-item" placeholder="last executed line (modify and press enter to re-evaluate)"></input>`;
-window.PW_statusbar_pageObjectModelName = document.createElement("span");
-PW_statusbar_pageObjectModelName.innerHTML = `<span class="PW-statusbar-item" title="page object model filename"></span>`;
-window.PW_statusbar_title = document.createElement("span");
-PW_statusbar_title.innerHTML = `<span class="PW-statusbar-item" style="font-size:1.5em; color:rgba(0,0,0,.15)">Playwright Live Recorder</span>`;
 
-PW_statusbar.appendChild(PW_statusbar_title);
-PW_statusbar.appendChild(PW_statusbar_pageObjectModelName);
-PW_statusbar.appendChild(PW_statusbar_repl);
-PW_statusbar.appendChild(PW_statusbar_recordToggleBtn);
+PW_statusbar.innerHTML= `
+    <input id="PW-repl" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
+    <!-- change visibility back after we figure out layout issues  <span id="PW-page-object-model-filename" class="PW-statusbar-item" style="width:0" title="page object model filename"/> -->
+    <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
+        <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
+        <label for="PW-record-checkbox" style="margin:8px"/>
+    </span>
+`;
+
 document.body.prepend(PW_statusbar);
 
+window.PW_repl = document.getElementById('PW-repl');
+PW_repl.addEventListener('keyup', event => (event.code || event.key) === 'Enter' ? PW_updateAndRerunLastCommand(PW_repl.value) : {})
 
 var PW_tooltip = document.createElement("div");
 PW_tooltip.setAttribute('id', 'PW_tooltip');
 PW_tooltip.classList.add('PW-tooltip');
 document.body.appendChild(PW_tooltip);
 window.PW_tooltip = PW_tooltip;
-
-
-/******** styles ********/
-var style = document.createElement('style');
-document.head.appendChild(style);
-style.sheet.insertRule(`.PW-tooltip {
-    position: absolute;
-    left: 0;
-    top: 0;
-    padding: 4px;
-    background: LavenderBlush;
-    outline: 1px solid black;
-    border-radius: 4px;
-    z-index: 2147483647;
-    visibility: hidden;
-}`);
-style.sheet.insertRule(`.PW-page-object-model-overlay {
-    position: absolute;
-    background-color: #ff8080;
-    opacity: 0.7;
-}`); //todo: add border, z-index
-
-style.sheet.insertRule(`.PW-statusbar {
-    position: sticky;
-    border-bottom: 1px solid #A0A0A0;
-    background: rgb(220, 220, 220);
-    display: flex;
-    justify-content: flex-end;
-}`);
-style.sheet.insertRule(`.PW-statusbar-item {
-    display: flex;
-}`);
 
 /******** behavior ********/
 var mouse_x = 0;
@@ -66,16 +33,15 @@ PW_config().then(c => window.config = c);
 function keyChord_toggleRecordMode(event) {
     if (!(event.ctrlKey && event.altKey && event.shiftKey)) return;
 
-    toggleRecordMode();
+    const chkbox = document.getElementById('PW-record-checkbox')
+    chkbox.checked = !chkbox.checked; //this doesn't fire the changed event handler, so call toggleRecordMode manually
+    toggleRecordMode(chkbox.checked);
 }
 
-function toggleRecordMode() {
-    recordModeOn = !recordModeOn;
+function toggleRecordMode(checked) {
+    recordModeOn = checked;
 
     if (recordModeOn) {
-        PW_statusbar_recordToggleBtn.title = "Recording, click to toggle off"
-        PW_statusbar_recordToggleBtn.style.color = "red";
-
         updateTooltipPosition(mouse_x, mouse_y);
         const element = document.elementFromPoint(mouse_x, mouse_y);
         updateTooltipContents(element);
@@ -85,7 +51,6 @@ function toggleRecordMode() {
             for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'visible';
         }
     } else {
-        PW_statusbar_recordToggleBtn.style.color = "gray";
         window.PW_tooltip.style.visibility = 'hidden';
         if(config.pageObjectModel.enabled) {
             for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'hidden';
@@ -139,18 +104,16 @@ async function recordModeClickHandler(event) {
 
         const result = document.PW_getRuleForElement(element);
         if (result.onClick) result.onClick(element);
-        await window.PW_eval(result.output(result.match(element)), true);
+        const resultOutput = result.output(result.match(element));
+        
+        PW_repl.value = resultOutput;
+        PW_repl.disabled = false;
+        await window.PW_eval(resultOutput, true);
     } finally {
         handlingClick = false;
     }
 }
 
-async function lastCommandRepl() {
-    const lastCommand = await PW_getLastCommand();
-    const updatedCommand = window.prompt('edit last command', lastCommand);
-    if (updatedCommand == null) return;
-    PW_updateAndRerunLastCommand(updatedCommand);
-}
 document.PW_getRuleForElement = function (el) {
     return RecorderRules.find(i => i.match(el) != null /* null or undefined */);
 };
@@ -171,7 +134,7 @@ async function reload_page_object_model_elements() {
     
     //get current page object to reflect across
     pageObjectName = await PW_urlToFilePath(window.location.href);
-    PW_statusbar_pageObjectModelName.innerText = pageObjectName;
+    //todo: re-enabled after figuring out layout issues // document.getElementById("PW-page-object-model-filename").innerText = pageObjectName;
     const pageObject = window[pageObjectName];
     if (pageObject === undefined) return;
 
