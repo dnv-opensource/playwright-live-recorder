@@ -11,10 +11,10 @@ export module PlaywrightRecorder {
         browserCodeCSSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.css',
         pageObjectModel: {
             enabled: true,
-            path: './src/page-object-models/',
+            path: './tests/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string|undefined>undefined,
-            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
+            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page.ts', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
             propertySelectorRegex: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
         }
     }
@@ -81,26 +81,27 @@ export module PlaywrightRecorder {
     }
 
     async function scanAndLoadPageObjectModels(page: Page) {
-        const watch = chokidar.watch(`${config.pageObjectModel.path}${config.pageObjectModel.filenameConvention}`);
+        const watch = chokidar.watch(`${config.pageObjectModel.filenameConvention}`, { cwd: config.pageObjectModel.path });
         watch.on('add', path => reloadPageObjectModel(page, path));
         watch.on('change', path => reloadPageObjectModel(page, path));
         //todo: figure out cleanup of the watcher. Assume current test task being ended is enough.
     }
 
     async function reloadPageObjectModel(page: Page, path: string) {
-        const fileContents = '' + await fs.readFile(path);
+        const fileContents = await fs.readFile(`${config.pageObjectModel.path}${path}`, { encoding: 'utf8' });
         const transpiled = ts.transpile(fileContents, { module: ts.ModuleKind.ESNext });
         //todo: make this work with modules or classes (currently only works with modules)
         //assume module name is same as filename
-        const className = /\\([^\\]+?).ts/.exec(path)![1]; //extract filename without extension as module name
+        const className = /\\([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
 
         //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
+        const exportReplacementText = `window.PW_pages['${path.replaceAll('\\', '/')}'] = {className: '${className}', page: ${className} };`;
         const content = transpiled
             //export class fixup
             .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`)
-            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, `window.${className} = ${className};`)
+            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)
             //export module fixup
-            .replace(`export var ${className};`, `window.PW_pages.${className} = ${className};`)
+            .replace(`export var ${className};`, exportReplacementText)
 
         await page.addScriptTag({ content });
     }
@@ -111,7 +112,7 @@ export module PlaywrightRecorder {
             //prepend imports from local test file into eval scope
             const testFileSource = await fs.readFile(testCallingLocation.file, 'utf-8');
             //ts.transpile(testFileSource) //todo: figure out how to use typescript to transpile `import` into `require` syntax
-            const importToRequireRegex = /\bimport\b\s*({?\s*[^}]+}?)\s*from\s*([^;]*);?/g;  
+            const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;  
             const matches = [...testFileSource.matchAll(importToRequireRegex)];
             const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
           

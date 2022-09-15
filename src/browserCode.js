@@ -5,7 +5,7 @@ PW_statusbar.classList.add('PW-statusbar');
 
 PW_statusbar.innerHTML= `
     <input id="PW-repl" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-    <!-- change visibility back after we figure out layout issues  <span id="PW-page-object-model-filename" class="PW-statusbar-item" style="width:0" title="page object model filename"/> -->
+    <span id="PW-page-object-model-filename" class="PW-statusbar-item" title="page object model filename"></span>
     <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
         <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
         <label for="PW-record-checkbox" style="margin:8px"/>
@@ -24,6 +24,8 @@ document.body.appendChild(PW_tooltip);
 window.PW_tooltip = PW_tooltip;
 
 /******** behavior ********/
+
+window.PW_pages = {};
 var mouse_x = 0;
 var mouse_y = 0;
 
@@ -31,7 +33,7 @@ var recordModeOn = false;
 PW_config().then(c => window.config = c);
 
 function keyChord_toggleRecordMode(event) {
-    if (!(event.ctrlKey && event.altKey && event.shiftKey)) return;
+    if (!(event.ctrlKey && event.altKey && event.shiftKey && event.key === 'R')) return;
 
     const chkbox = document.getElementById('PW-record-checkbox')
     chkbox.checked = !chkbox.checked; //this doesn't fire the changed event handler, so call toggleRecordMode manually
@@ -123,7 +125,7 @@ window.addEventListener('click', recordModeClickHandler, true);
 
 /******** page object model feature ********/
 
-var pageObjectName = '';
+var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
     //var $ = document.querySelector.bind(document);
@@ -133,16 +135,16 @@ async function reload_page_object_model_elements() {
     window.PW_overlays = [];
     
     //get current page object to reflect across
-    pageObjectName = await PW_urlToFilePath(window.location.href);
-    //todo: re-enabled after figuring out layout issues // document.getElementById("PW-page-object-model-filename").innerText = pageObjectName;
-    const pageObject = window[pageObjectName];
+    pageObjectFilePath = await PW_urlToFilePath(window.location.href);
+    document.getElementById("PW-page-object-model-filename").innerText = pageObjectFilePath;
+    const pageObject = window.PW_pages[pageObjectFilePath];
     if (pageObject === undefined) return;
 
     const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
-    for (var prop in pageObject) {
+    for (var prop in pageObject.page) {
         if (!propertyRegex.test(prop)) continue;
 
-        const selector = pageObject[prop];
+        const selector = pageObject.page[prop];
         const el = $$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
 
         const rect = el.getBoundingClientRect();
@@ -155,9 +157,9 @@ async function reload_page_object_model_elements() {
 
         //todo: use a regex instead
         const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
-        const selectorMethod = '' + pageObject[selectorMethodName].toString();
+        const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-        overlayEl.setAttribute('data-page-object-model', `${pageObjectName}.${selectorMethodName}${selectorMethodArgs}`);
+        overlayEl.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
 
         //todo: extract into css style
         overlayEl.classList.add('PW-page-object-model-overlay');
