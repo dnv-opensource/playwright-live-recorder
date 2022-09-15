@@ -1,12 +1,22 @@
 import { Page, test } from "@playwright/test";
 import * as fs from "fs/promises";
-
+import * as chokidar from "chokidar";
+import * as ts from "typescript";
 
 export module PlaywrightRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
-        recorderRulesPath: './src/recorderRules.js',
-        browserCodePath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
+        recorderRulesPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/example/recorderRules.js',
+        browserCodeJSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
+        browserCodeCSSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.css',
+        pageObjectModel: {
+            enabled: true,
+            path: './tests/',
+            filenameConvention: '**/*_page.ts',
+            baseUrl: <string|undefined>undefined,
+            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page.ts', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
+            propertySelectorRegex: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
+        }
     }
 
     /**
@@ -14,6 +24,7 @@ export module PlaywrightRecorder {
      */
     export async function startLiveCoding(page: Page, evalScope: (s: string) => any) {
         const isHeadless = test.info().config.projects[0].use.headless; //hack: using projects[0] since can't find 'use.*' otherwise
+        config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().config.projects[0].use.baseURL!; //hack: using projects[0] since can't find 'use.*' otherwise
         if (isHeadless !== false) {
             console.error('startLiveCoding called while running headless');
             return;
@@ -26,7 +37,8 @@ export module PlaywrightRecorder {
 
         //todo: figure out how to log a step to show the 'live coding' is being attached
         await init(page, testCallingLocation, evalScope);
-        await page.waitForEvent("close", {timeout: 1000 * 60 * 60});
+        if (config.pageObjectModel.enabled) await scanAndLoadPageObjectModels(page);
+        await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
     var lastCommand: string = '';
@@ -39,28 +51,76 @@ export module PlaywrightRecorder {
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await TestingContext_eval(testCallingLocation, evalScope, page, testEval, true, lastCommand));
 
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(matcherCode));
+        
+        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.pageObjectModel.urlToFilePath(url));
+        await page.exposeFunction('PW_config', () => {
+            //shenanigans to get regexp and functions to serialize reasonably
+            (<any>RegExp.prototype).toJSON = RegExp.prototype.toString;
+            (<any>Function.prototype).toJSON = Function.prototype.toString;
+            const result = JSON.stringify(config);
+            delete (<any>RegExp.prototype).toJSON;
+            delete (<any>Function.prototype).toJSON;
+          
+            return JSON.parse(result);
+        });
 
         await page.addScriptTag({ path: config.recorderRulesPath });
-        await page.addScriptTag({ path: config.browserCodePath });
+        await page.addScriptTag({ path: config.browserCodeJSPath });
+        await page.addStyleTag({ path: config.browserCodeCSSPath});
 
         page.on('dialog', dialog => {/* allow user interaction for browser interaction with PW_updateAndRunLastCommand */ });
 
-        // tslint:disable-next-line: no-floating-promises
+        // tslint:disable: no-floating-promises
         (async () => { for await (const event of fs.watch(config.recorderRulesPath)) event.eventType === 'change' ? await page.addScriptTag({ path: config.recorderRulesPath }) : {}; })(); //fire-and-forget the watcher
+        if ((<any>config).watchLibFiles) {
+            (async () => { for await (const event of fs.watch(config.browserCodeJSPath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodeJSPath}) : {}; })();   //fire-and-forget the watcher
+            (async () => { for await (const event of fs.watch(config.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({path: config.browserCodeCSSPath}) : {}; })();  //fire-and-forget the watcher
+        }
+        // tslint:enable: no-floating-promises
+        
+    }
 
-        // tslint:disable-next-line: no-floating-promises
-        //(async () => { for await (const event of fs.watch(config.browserCodePath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodePath}) : {}; })();
-        // uncomment line above if live reloading of browserCode.js needed
+    async function scanAndLoadPageObjectModels(page: Page) {
+        const watch = chokidar.watch(`${config.pageObjectModel.filenameConvention}`, { cwd: config.pageObjectModel.path });
+        watch.on('add', path => reloadPageObjectModel(page, path));
+        watch.on('change', path => reloadPageObjectModel(page, path));
+        //todo: figure out cleanup of the watcher. Assume current test task being ended is enough.
+    }
+
+    async function reloadPageObjectModel(page: Page, path: string) {
+        const fileContents = await fs.readFile(`${config.pageObjectModel.path}${path}`, { encoding: 'utf8' });
+        const transpiled = ts.transpile(fileContents, { module: ts.ModuleKind.ESNext });
+        //todo: make this work with modules or classes (currently only works with modules)
+        //assume module name is same as filename
+        const className = /\\([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
+
+        //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
+        const exportReplacementText = `window.PW_pages['${path.replaceAll('\\', '/')}'] = {className: '${className}', page: ${className} };`;
+        const content = transpiled
+            //export class fixup
+            .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`)
+            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)
+            //export module fixup
+            .replace(`export var ${className};`, exportReplacementText)
+
+        await page.addScriptTag({ content });
     }
 
     async function TestingContext_eval(testCallingLocation: { file: string, line: number }, evalScope: (s:string) => any, page: Page, testEval: string, record = true, commandToOverwrite: string | undefined = undefined) {
         try {
-            const s = testEval.replace(/^await /, '');
-            await evalScope(s);
-            lastCommand = testEval;
+            const s = testEval.replaceAll(/\bawait\b/g, ''); //hack - eval doesn't play well with awaits, ideally we'd transpile it into promises... but I don't know how to use `typescript` lib to do this
+            //prepend imports from local test file into eval scope
+            const testFileSource = await fs.readFile(testCallingLocation.file, 'utf-8');
+            //ts.transpile(testFileSource) //todo: figure out how to use typescript to transpile `import` into `require` syntax
+            const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;  
+            const matches = [...testFileSource.matchAll(importToRequireRegex)];
+            const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
+          
+            await evalScope(`${imports}\n${s}`);
             if (record) {
                 await recordLineToTestFile(testCallingLocation, testEval, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
+                lastCommand = testEval;
             }
         } catch (error) {
             if (error instanceof Error) {
@@ -74,6 +134,7 @@ export module PlaywrightRecorder {
             if (record) {
                 await recordLineToTestFile(testCallingLocation, `//${testEval} // failed to execute`, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
+                lastCommand = testEval;
             }
         }
     }
