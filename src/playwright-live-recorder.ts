@@ -3,12 +3,12 @@ import * as fs from "fs/promises";
 import * as chokidar from "chokidar";
 import * as ts from "typescript";
 
-export module PlaywrightRecorder {
+export module PlaywrightLiveRecorder {
     //todo: figure out how to decorate .d.ts with default paths
     export const config = {
-        recorderRulesPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/example/recorderRules.js',
-        browserCodeJSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.js',
-        browserCodeCSSPath: './node_modules/@dnvgl-electricgrid/playwright-recorder/dist/browserCode.css',
+        recorderRulesPath: './node_modules/@dnvgl/playwright-live-recorder/dist/example/recorderRules.js',
+        browserCodeJSPath: './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.js',
+        browserCodeCSSPath: './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.css',
         pageObjectModel: {
             enabled: true,
             path: './tests/',
@@ -22,7 +22,7 @@ export module PlaywrightRecorder {
     /**
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
      */
-    export async function startLiveCoding(page: Page, evalScope: (s: string) => any) {
+    export async function start(page: Page, evalScope: (s: string) => any) {
         const isHeadless = test.info().config.projects[0].use.headless; //hack: using projects[0] since can't find 'use.*' otherwise
         config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().config.projects[0].use.baseURL!; //hack: using projects[0] since can't find 'use.*' otherwise
         if (isHeadless !== false) {

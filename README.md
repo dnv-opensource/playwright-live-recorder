@@ -1,4 +1,4 @@
-# Playwright-recorder
+# playwright-live-recorder
 
 Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.
 
@@ -11,4 +11,5 @@ todo: add usage examples and gifs
 todo: add features list
 
 ## Technical Implementation
-![](diagram.png "Playwright Live Recorder diagram")
+
+todo: add diagram

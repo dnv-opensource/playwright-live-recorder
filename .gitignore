@@ -1,4 +1,3 @@
 node_modules/
 dist/
-dnvgl-electricgrid-playwright-recorder-*.tgz
-dnv-playwright-recorder-*.tgz
+dnvgl-playwright-live-recorder-*.tgz

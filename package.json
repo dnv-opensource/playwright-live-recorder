@@ -1,27 +1,25 @@
 {
-  "name": "@dnvgl-electricgrid/playwright-recorder",
+  "name": "@dnvgl/playwright-live-recorder",
   "type": "commonjs",
   "version": "1.0.0",
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
-  "main": "dist/playwright-recorder.js",
+  "main": "dist/playwright-live-recorder.js",
   "files": [
     "dist/**/*.*"
   ],
-  "repository": "https://github.com/dnvgl/playwright-recorder",
+  "repository": "https://github.com/dnv-opensource/playwright-live-recorder",
   "author": "DNV",
   "license": "MIT",
   "private": false,
   "scripts": {
-    "prepack": "tslint -p . && tsc && cpx \"src/**/*.{js,css}\" dist",
-    "c": "cpx \"src/**/*.js\" dist"
+    "prepack": "tslint -p . && tsc && cpx \"src/**/*.{js,css}\" dist"
   },
   "devDependencies": {
-    "@playwright/test": "^1.22.2",
     "cpx": "^1.5.0",
-    "tslint": "^6.1.3",
-    "typescript": "^4.7.4"
+    "tslint": "^6.1.3"
   },
   "dependencies": {
+    "@playwright/test": "^1.0.0",
     "chokidar": "^3.5.3",
     "typescript": "^4.8.2"
   }
