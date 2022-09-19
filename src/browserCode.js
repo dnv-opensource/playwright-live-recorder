@@ -125,6 +125,8 @@ window.addEventListener('click', recordModeClickHandler, true);
 
 /******** page object model feature ********/
 
+window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
+
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {

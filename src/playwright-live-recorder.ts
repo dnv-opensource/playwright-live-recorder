@@ -14,7 +14,13 @@ export module PlaywrightLiveRecorder {
             path: './tests/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string|undefined>undefined,
-            urlToFilePath: (url: string) => url.replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') + '_page.ts', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
+            urlToFilePath: (url: string) => url
+                .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
+                .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
+                .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
+                .replace(/\/$/, '') // clear trailing /
+                 + '_page.ts', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
             propertySelectorRegex: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
         }
     }
@@ -97,11 +103,11 @@ export module PlaywrightLiveRecorder {
         //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
         const exportReplacementText = `window.PW_pages['${path.replaceAll('\\', '/')}'] = {className: '${className}', page: ${className} };`;
         const content = transpiled
-            //export class fixup
-            .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`)
-            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)
-            //export module fixup
-            .replace(`export var ${className};`, exportReplacementText)
+            //.replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, 'const $1 = require($2);') //convert 'import' to 'require' statements
+            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '') //remove all (local) import statements //todo: extract and track local imports to create a loading order/hierarchy
+            .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`) //export class fixup
+            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)                                //export class fixup
+            .replace(`export var ${className};`, exportReplacementText) //export module fixup
 
         await page.addScriptTag({ content });
     }
