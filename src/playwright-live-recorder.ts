@@ -4,24 +4,41 @@ import * as chokidar from "chokidar";
 import { pomLoader } from "./pomLoader";
 
 export module PlaywrightLiveRecorder {
-    //todo: figure out how to decorate .d.ts with default paths
     export const config = {
+        /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/example/recorderRules.js' */
         recorderRulesPath: './node_modules/@dnvgl/playwright-live-recorder/dist/example/recorderRules.js',
+        /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.js' */
         browserCodeJSPath: './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.js',
+        /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.css' */
         browserCodeCSSPath: './node_modules/@dnvgl/playwright-live-recorder/dist/browserCode.css',
+        /** @default false */
+        watchLibFiles: false,
         pageObjectModel: {
+            /** @default true */
             enabled: true,
+            /** @default './tests/' */
             path: './tests/',
+            /** @default '**\/*_page.ts' */
             filenameConvention: '**/*_page.ts',
+            /** @default (use.baseURL value from Playwright config) */
             baseUrl: <string|undefined>undefined,
+            /** @default (url: string) => url
+                .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
+                .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
+                .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
+                .replace(/\/$/, '') // clear trailing /
+                 + '_page.ts',
+             */
             urlToFilePath: (url: string) => url
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                 .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
-                 + '_page.ts', //strip the baseUrl //todo: strip numeric id and guids from url //todo: strip query parameters from url
-            propertySelectorRegex: /(.+)_selector/, //use this to find list of all selectors, and lookup property from selector
+                 + '_page.ts',
+            /** @remarks Use this to find list of all selectors, and lookup property from selector @default /(.+)_selector/*/
+            propertySelectorRegex: /(.+)_selector/,
         }
     }
 
@@ -43,7 +60,7 @@ export module PlaywrightLiveRecorder {
 
         //todo: figure out how to log a step to show the 'live coding' is being attached
         await init(page, testCallingLocation, evalScope);
-        if (config.pageObjectModel.enabled) await scanAndLoadPageObjectModels(page);
+        if (config.pageObjectModel.enabled) await watchAndLoadPageObjectModels(page);
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
@@ -78,7 +95,7 @@ export module PlaywrightLiveRecorder {
 
         // tslint:disable: no-floating-promises
         (async () => { for await (const event of fs.watch(config.recorderRulesPath)) event.eventType === 'change' ? await page.addScriptTag({ path: config.recorderRulesPath }) : {}; })(); //fire-and-forget the watcher
-        if ((<any>config).watchLibFiles) {
+        if (config.watchLibFiles) {
             (async () => { for await (const event of fs.watch(config.browserCodeJSPath)) event.eventType === 'change' ? await page.addScriptTag({path: config.browserCodeJSPath}) : {}; })();   //fire-and-forget the watcher
             (async () => { for await (const event of fs.watch(config.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({path: config.browserCodeCSSPath}) : {}; })();  //fire-and-forget the watcher
         }
@@ -86,13 +103,12 @@ export module PlaywrightLiveRecorder {
         
     }
 
-    async function scanAndLoadPageObjectModels(page: Page) {
+    async function watchAndLoadPageObjectModels(page: Page) {
         const watch = chokidar.watch(`${config.pageObjectModel.filenameConvention}`, { cwd: config.pageObjectModel.path });
-        const allFiles = watch.getWatched();
-        await pomLoader.loadAll(allFiles, config.pageObjectModel.path, page);
+        //note: watch.getWatched is empty, we're relying on the individual page reload process to ensure everything is loaded
+
         watch.on('add', path => pomLoader.reload(path, config.pageObjectModel.path, page));
         watch.on('change', path => pomLoader.reload(path, config.pageObjectModel.path, page));
-        //todo: figure out cleanup of the watcher. Assume current test task being ended is enough.
     }
 
     async function TestingContext_eval(testCallingLocation: { file: string, line: number }, evalScope: (s:string) => any, page: Page, testEval: string, record = true, commandToOverwrite: string | undefined = undefined) {
