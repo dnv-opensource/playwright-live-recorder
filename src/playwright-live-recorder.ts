@@ -1,7 +1,7 @@
 import { Page, test } from "@playwright/test";
 import * as fs from "fs/promises";
 import * as chokidar from "chokidar";
-import * as ts from "typescript";
+import { pomLoader } from "./pomLoader";
 
 export module PlaywrightLiveRecorder {
     //todo: figure out how to decorate .d.ts with default paths
@@ -88,28 +88,11 @@ export module PlaywrightLiveRecorder {
 
     async function scanAndLoadPageObjectModels(page: Page) {
         const watch = chokidar.watch(`${config.pageObjectModel.filenameConvention}`, { cwd: config.pageObjectModel.path });
-        watch.on('add', path => reloadPageObjectModel(page, path));
-        watch.on('change', path => reloadPageObjectModel(page, path));
+        const allFiles = watch.getWatched();
+        await pomLoader.loadAll(allFiles, config.pageObjectModel.path, page);
+        watch.on('add', path => pomLoader.reload(path, config.pageObjectModel.path, page));
+        watch.on('change', path => pomLoader.reload(path, config.pageObjectModel.path, page));
         //todo: figure out cleanup of the watcher. Assume current test task being ended is enough.
-    }
-
-    async function reloadPageObjectModel(page: Page, path: string) {
-        const fileContents = await fs.readFile(`${config.pageObjectModel.path}${path}`, { encoding: 'utf8' });
-        const transpiled = ts.transpile(fileContents, { module: ts.ModuleKind.ESNext });
-        //todo: make this work with modules or classes (currently only works with modules)
-        //assume module name is same as filename
-        const className = /\\([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
-
-        //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
-        const exportReplacementText = `window.PW_pages['${path.replaceAll('\\', '/')}'] = {className: '${className}', page: ${className} };`;
-        const content = transpiled
-            //.replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, 'const $1 = require($2);') //convert 'import' to 'require' statements
-            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '') //remove all (local) import statements //todo: extract and track local imports to create a loading order/hierarchy
-            .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`) //export class fixup
-            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)                                //export class fixup
-            .replace(`export var ${className};`, exportReplacementText) //export module fixup
-
-        await page.addScriptTag({ content });
     }
 
     async function TestingContext_eval(testCallingLocation: { file: string, line: number }, evalScope: (s:string) => any, page: Page, testEval: string, record = true, commandToOverwrite: string | undefined = undefined) {
@@ -177,3 +160,4 @@ export module PlaywrightLiveRecorder {
 }
 
 const _NEWLINE = /\r\n|\n|\r/;
+
