@@ -12,9 +12,10 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "prepack": "tslint -p . && tsc && cpx \"src/**/*.{js,css}\" dist"
+    "build": "tslint -p . && tsc && cpx \"src/**/*.{js,css}\" dist"
   },
   "devDependencies": {
+    "@playwright/test": "^1.0.0",
     "cpx": "^1.5.0",
     "tslint": "^6.1.3"
   },
