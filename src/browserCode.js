@@ -67,8 +67,12 @@ function updateTooltipContents(element) {
 }
 
 function updateTooltipPosition(x,y) {
-    PW_tooltip.style.left = x + 'px';
-    PW_tooltip.style.top = y + 16 + 'px';
+    let xOffset = 0;
+    let yOffset = 16;
+    if (x > window.visualViewport.width * 0.75) xOffset = -xOffset - PW_tooltip.getBoundingClientRect().width;
+    if (y > window.visualViewport.height * 0.75) yOffset = -yOffset - PW_tooltip.getBoundingClientRect().height;
+    PW_tooltip.style.left = x + xOffset + 'px';
+    PW_tooltip.style.top = y + yOffset + 'px';
 }
 
 function mousemove_updateTooltip(event) {
@@ -149,23 +153,24 @@ async function reload_page_object_model_elements() {
         const selector = pageObject.page[prop];
         const el = $$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
 
-        const rect = el.getBoundingClientRect();
+        const overlayWrapperEl = document.createElement('div');
+        overlayWrapperEl.style.display = 'grid';
+
         const overlayEl = document.createElement('div');
-        overlayEl.style.top = rect.top + 'px';
-        overlayEl.style.left = rect.left + 'px';
-        overlayEl.style.width = rect.width + 'px';
-        overlayEl.style.height = rect.height + 'px';
-        //todo: add listener on source element to modify size/position
 
         //todo: use a regex instead
         const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
         const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
         overlayEl.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-
-        //todo: extract into css style
         overlayEl.classList.add('PW-page-object-model-overlay');
-        el.insertAdjacentElement('afterend', overlayEl);
+        
+        overlayEl.classList.add('PW-grid-first-cell');
+        el.classList.add('PW-grid-first-cell');
+
+        el.parentNode.insertBefore(overlayWrapperEl, el);
+        overlayWrapperEl.appendChild(el);
+        overlayWrapperEl.appendChild(overlayEl);
         window.PW_overlays.push(overlayEl);
     }
 }
