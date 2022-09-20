@@ -1,5 +1,8 @@
 # playwright-live-recorder
 
+## <span style="color:red">Warning: this library is incomplete, and in active development</span>
+Use at your discretion. This library is already extremely powerful, but is certainly also riddled with bugs.
+
 ![Playwright live recorder design](playwright-live-recorder-title-screen.png "Playwright live recorder design")
 
 >## **REPL** - Execute arbitrary code in testing context
@@ -19,8 +22,10 @@
 >Overlays existing POM elements onscreen, clicking them generates idiomatic code
 >
 >**Building out the POM**  
->Click elements on screen to name and add them to the POM
-
+>Click elements on screen to name and add them to the POM 🛑 (not yet implemented)
+>
+>**Hierarchies and components**  
+>Support for nested page object model and component objects ⚠️ (partially implemented)
 
 # Additional Details
 
