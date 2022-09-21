@@ -1,4 +1,4 @@
-import { pomLoader } from '../src/pomLoader';
+import { pomLoader } from '../src/pageObjectModel';
 import {test, expect} from '@jest/globals';
 
 

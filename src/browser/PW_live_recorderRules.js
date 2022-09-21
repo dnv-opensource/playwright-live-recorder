@@ -1,16 +1,16 @@
-import('https://medv.io/finder/finder.js').then(m => window.finder = m.finder);
 var $ = document.querySelector.bind(document);
 var $$ = document.querySelectorAll.bind(document);
 
+var playwrightInjectedScript = new InjectedScript(true, 0, 'chromium', []);
 /**
- * RecorderRules contract:
+ * PW_live_recorderRules contract:
  * array of { match(el) => resultType | undefined, output(x: resultType) => code: string, <optional>onClick(el)}
  * notes: 
  *   match(el) => null/undefined inidicates not a match
  *   rules are evaluated in order (top to bottom)
  *   currently hovered element is passed into each match
  */
-var RecorderRules = [
+var PW_live_recorderRules = [
     {
         //page object model rule
         match: (el) => el.getAttribute('data-page-object-model') ?? undefined,
@@ -32,7 +32,7 @@ var RecorderRules = [
         output: (x) => x.nth === undefined ? `await page.locator('${x}').click();` : `await page.locator('${x.selector}').nth(${x.nth}).click();`
     },
     {
-        match: (el) => finder(el),
+        match: (el) => playwrightInjectedScript.generateSelector(el),
         output: (selector) => `await page.locator('${selector}').click();`
     }
 ];
