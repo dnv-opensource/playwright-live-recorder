@@ -1,9 +1,11 @@
 import * as _ from "lodash";
 import * as fs from "fs/promises";
 import * as ts from "typescript";
+import * as chokidar from "chokidar";
+import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 
-const TrackedPoms: {[name: string]: PomEntry} = {};
+const TrackedPoms: { [name: string]: PomEntry } = {};
 
 export interface PomEntry {
     name: string;
@@ -12,29 +14,39 @@ export interface PomEntry {
     isLoaded: boolean;
 }
 
-export module pomLoader {
+//scans and watches page object model files, transpiles and exposes page object models to the browser context
+export module pageObjectModel {
+    export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
+        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
+
+        const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
+        
+        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process ensures everything is loaded
+        watch.on('add', path => reload(path, config.path, page));
+        watch.on('change', path => reload(path, config.path, page));
+    }
+
     export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {
         const pom = await _reload(path, config_pageObjectModel_path);
         TrackedPoms[pom.name] = pom;
-        await _attemptToLoadPom(pom, page);
+        await _attemptLoadPom(pom, page);
     }
 
-    export async function _attemptToLoadPom(pom: PomEntry, page: Page) {
+    export async function _attemptLoadPom(pom: PomEntry, page: Page) {
         if (pom.deps.some(dep => TrackedPoms[dep]?.isLoaded !== true))
             return; //not all dependencies are loaded, don't load the script yet, it'll get automatically loaded when the last thing it's dependent upon is loaded
-        
+
         try {
             await page.addScriptTag({ content: pom.content });
             pom.isLoaded = true; //it loaded successfully, mark it as loaded
-            
+
             //attempt reload of any TrackedPoms dependent upon it
             for (const otherPom of _.filter(TrackedPoms, (otherPom) => otherPom.name !== pom.name && otherPom.deps.includes(pom.name)))
-                await _attemptToLoadPom(otherPom, page);
-        } catch(e) {
+                await _attemptLoadPom(otherPom, page);
+        } catch (e) {
             console.error(`error calling page.addScriptTag for pom ${pom.name}`);
             throw e; //todo: check if this causes recorder to stop working, if so, console log the error instead of rethrowing
         }
-
     }
 
     export async function _reload(path: string, config_pageObjectModel_path: string) {

@@ -121,7 +121,7 @@ async function recordModeClickHandler(event) {
 }
 
 document.PW_getRuleForElement = function (el) {
-    return RecorderRules.find(i => i.match(el) != null /* null or undefined */);
+    return PW_live_recorderRules.find(i => i.match(el) != null /* null or undefined */);
 };
 window.addEventListener('keydown', keyChord_toggleRecordMode);
 window.addEventListener('mousemove', mousemove_updateTooltip);
