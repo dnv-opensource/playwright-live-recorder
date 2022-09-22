@@ -11,10 +11,17 @@
 }
 
 .PW-page-object-model-overlay {
-    position: fixed;
+    position: relative;
     background-color: #ff8080;
     opacity: 0.7;
     z-index: 2147483646;
+    width: 100%;
+    height:100%;
+}
+
+.PW-grid-first-cell {
+    grid-row-start: 1;
+    grid-column-start: 1;
 }
 
 .PW-statusbar {
