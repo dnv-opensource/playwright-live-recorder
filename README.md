@@ -3,7 +3,7 @@
 ## 🛑 Warning: this library is incomplete, and in active development 🛑
 Use at your discretion. This library is already very useful, but is certainly also riddled with bugs.
 
-![Playwright live recorder design](playwright-live-recorder-title-screen.png "Playwright live recorder design")
+![Playwright live recorder design](docs/playwright-live-recorder-title-screen.png "Playwright live recorder design")
 # Features
 
 >### **REPL** - Execute arbitrary code in testing context
