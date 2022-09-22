@@ -1,7 +1,3 @@
-var $ = document.querySelector.bind(document);
-var $$ = document.querySelectorAll.bind(document);
-
-var playwrightInjectedScript = new InjectedScript(true, 0, 'chromium', []);
 /**
  * PW_live_recorderRules contract:
  * array of { match(el) => resultType | undefined, output(x: resultType) => code: string, <optional>onClick(el)}
@@ -10,6 +6,9 @@ var playwrightInjectedScript = new InjectedScript(true, 0, 'chromium', []);
  *   rules are evaluated in order (top to bottom)
  *   currently hovered element is passed into each match
  */
+
+ const $$ = playwright ? playwright.$$.bind(this) : document.querySelectorAll.bind(this);
+
 var PW_live_recorderRules = [
     {
         //page object model rule
@@ -32,7 +31,7 @@ var PW_live_recorderRules = [
         output: (x) => x.nth === undefined ? `await page.locator('${x}').click();` : `await page.locator('${x.selector}').nth(${x.nth}).click();`
     },
     {
-        match: (el) => playwrightInjectedScript.generateSelector(el),
+        match: (el) => playwright.selector(el),
         output: (selector) => `await page.locator('${selector}').click();`
     }
 ];

@@ -52,7 +52,7 @@ export module PlaywrightLiveRecorder {
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
      */
     export async function start(page: Page, evalScope: (s: string) => any) {
-        const isHeadless = test.info().config.projects[0].use.headless; //hack: using projects[0] since can't find 'use.*' otherwise
+        const isHeadless = test.info().project.use.headless;
         if (isHeadless !== false) {
             console.error('startLiveCoding called while running headless');
             return;
@@ -62,7 +62,7 @@ export module PlaywrightLiveRecorder {
         await recorder.init(config.recorder, page);
 
         if (config.pageObjectModel.enabled) {
-            config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().config.projects[0].use.baseURL!; //hack: using projects[0] since can't find 'use.*' otherwise
+            config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
             await pageObjectModel.init(config.pageObjectModel, page);
         }
 
@@ -70,6 +70,11 @@ export module PlaywrightLiveRecorder {
 
         await page.addScriptTag({ path: config.debug.browserCodeJSPath });
         await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
+
+        await page.addScriptTag({path: './node_modules/jquery/dist/jquery.min.js'});
+        
+        await page.addStyleTag({path: './node_modules/toastr/build/toastr.min.css'});
+        await page.addScriptTag({path: './node_modules/toastr/build/toastr.min.js'});
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 

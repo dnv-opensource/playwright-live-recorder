@@ -134,9 +134,7 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
-    //var $ = document.querySelector.bind(document);
-    var $$ = document.querySelectorAll.bind(document);
-
+    const $$ = playwright ? playwright.$$ : document.querySelectorAll;
     if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
     
@@ -151,7 +149,7 @@ async function reload_page_object_model_elements() {
         if (!propertyRegex.test(prop)) continue;
 
         const selector = pageObject.page[prop];
-        const el = $$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
+        const el = playwright.$$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
 
         const overlayWrapperEl = document.createElement('div');
         overlayWrapperEl.style.display = 'grid';
@@ -173,4 +171,19 @@ async function reload_page_object_model_elements() {
         overlayWrapperEl.appendChild(overlayEl);
         window.PW_overlays.push(overlayEl);
     }
+}
+
+//pageObject selector evaluation requires `playwright` object, warn user if it's not available
+if (!playwright) {
+    toastr.options = {
+        timeOut: 0,
+        extendedTimeOut: 0,
+        closeButton: true,
+    };
+    toastr.error(`Add by setting environment variable
+    <pre style="background:black;color:white">PWDEBUG=console</pre>
+    or if using vscode ms-playwright.playwright extension, add the follow block into <a>.vscode/settings.json</a>
+    <pre style="background:black;color:white">"playwright.env": {
+    "PWDEBUG": "console"
+},</pre>`, 'missing `playwright` object');
 }
