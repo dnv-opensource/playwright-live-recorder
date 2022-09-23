@@ -7,7 +7,7 @@ PW_statusbar.classList.add('PW');
 PW_statusbar.innerHTML= `
     <div class="PW-statusbar">
         <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-        <span id="PW-page-object-model-filename" class="PW-statusbar-item" title="page object model filename"></span>
+        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" placeholder="page object model filename"></span>
         <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
             <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
             <label for="PW-record-checkbox" style="margin:8px"/>
@@ -96,10 +96,10 @@ function updateTooltipPosition(x,y) {
 function mousemove_updateTooltip(event) {
     const element = document.elementFromPoint(event.x, event.y);
     if (element == null) return;
-    if (element.closest(".PW")) return;
 
     mouse_x = event.x;
     mouse_y = event.y;
+    window.PW_tooltip.style.visibility = (!recordModeOn || element.closest(".PW")) ? 'hidden' : 'visible';
     if (!recordModeOn) return;
 
     updateTooltipPosition(mouse_x, mouse_y);
@@ -158,7 +158,7 @@ async function reload_page_object_model_elements() {
     
     //get current page object to reflect across
     pageObjectFilePath = await PW_urlToFilePath(window.location.href);
-    document.getElementById("PW-page-object-model-filename").innerText = pageObjectFilePath;
+    document.getElementById("PW-page-object-model-filename").value = pageObjectFilePath;
     const pageObject = window.PW_pages[pageObjectFilePath];
     if (pageObject === undefined) return;
 
