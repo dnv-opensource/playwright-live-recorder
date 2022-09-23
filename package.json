@@ -27,8 +27,6 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "lodash": "^4.17.21",
-    "typescript": "^4.8.2",
-    "jquery": "^3.6.1",
-    "toastr": "^2.1.4"
+    "typescript": "^4.8.2"
   }
 }

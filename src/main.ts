@@ -71,11 +71,6 @@ export module PlaywrightLiveRecorder {
         await page.addScriptTag({ path: config.debug.browserCodeJSPath });
         await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
 
-        await page.addScriptTag({path: './node_modules/jquery/dist/jquery.min.js'});
-        
-        await page.addStyleTag({path: './node_modules/toastr/build/toastr.min.css'});
-        await page.addScriptTag({path: './node_modules/toastr/build/toastr.min.js'});
-
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 
         if (config.debug.watchLibFiles) {

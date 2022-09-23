@@ -7,7 +7,7 @@
  *   currently hovered element is passed into each match
  */
 
- const $$ = playwright ? playwright.$$.bind(this) : document.querySelectorAll.bind(this);
+const $$ = window.playwright ? window.playwright.$$.bind(this) : document.querySelectorAll.bind(this);
 
 var PW_live_recorderRules = [
     {

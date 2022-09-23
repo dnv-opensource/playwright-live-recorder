@@ -1,3 +1,7 @@
+.PW {
+    border-bottom:1px solid black;
+}
+
 .PW-tooltip {
     position: absolute;
     left: 0;
@@ -28,7 +32,7 @@
     position: sticky;
     background: #eee;
     display: flex;
-    z-index: 2147483647
+    z-index: 2147483647;
 }
 
 .PW-statusbar-item {
@@ -57,4 +61,24 @@
 .PW-checkbox-recording input[type=checkbox]:checked+label {
     background: #d00;
     box-shadow: 0 0 5px #d00;
+}
+
+#PW-eval-error-details {
+    background: #f0f0f0;
+    padding: 0.5em;
+}
+
+#PW-eval-error-summary {
+    background: salmon;
+    padding: 0 0.5em;
+}
+
+#PW-page-object-model-filename {
+    align-items: center;
+    padding: 0 0.5em;
+}
+
+.PW-pre {
+    background:black;
+    color:white;
 }
