@@ -6,8 +6,6 @@ import { PlaywrightLiveRecorderConfig_recorder } from "./types";
 export module recorder {
     export async function init(config: PlaywrightLiveRecorderConfig_recorder, page: Page) {
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(config.path, matcherCode));
-        
-        await page.addScriptTag({ content: await _getPlaywrightInjectedScriptSource(), type: 'module'}); //pull in playwright's injectedScript to utilize their 'generateSelector' method
         await page.addScriptTag({ path: config.path });
 
         // tslint:disable-next-line: no-floating-promises
@@ -27,14 +25,6 @@ export module recorder {
     },`);
 
         await fs.writeFile(config_recorder_path, lines.join('\n'));
-    }
-
-    /** this is janky, we're pulling in playwright's InjectedScript class directly, to use by the recorder */
-    async function _getPlaywrightInjectedScriptSource() {
-        const playwrightInjectedScript = await fs.readFile('node_modules/playwright-core/lib/generated/injectedScriptSource.js', 'utf-8');
-        const playwrightInjectedScriptSource = eval(`${playwrightInjectedScript}\r\source;`)    //return the source code
-                                                .replaceAll(/^(module\.exports.*)/gm, '//$1');  //having trouble with modules, comment out the offending bits for now
-        return `${playwrightInjectedScriptSource}\r\nwindow.InjectedScript = InjectedScript;`;
     }
 }
 const _NEWLINE = /\r\n|\n|\r/;

@@ -29,6 +29,7 @@ export module repl {
             const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
 
             await evalScope(`${imports}\n${s}`);
+            await pageEvaluate(`reportError()`);
             if (record) {
                 await writeLineToTestFile(testCallingLocation, testEval, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
@@ -36,10 +37,10 @@ export module repl {
             }
         } catch (error) {
             if (error instanceof Error) {
-                await pageEvaluate(`console.error(\`${error.name}: ${error.message}\`);`); //todo: toast message instead
+                await pageEvaluate(`reportError(\`${error.message}\`, \`${error.stack}\`)`);
                 console.warn(error);
             } else {
-                await pageEvaluate(`console.error(\`non-standard error. See DEBUG CONSOLE in test execution environment for details\`);`); //todo: toast message instead
+                await pageEvaluate(`reportError(\`Unexpected error during eval - See DEBUG CONSOLE in test execution environment for details\`, \`${JSON.stringify(error)}\`)`);
                 console.error(error);
             }
 

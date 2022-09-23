@@ -1,22 +1,40 @@
 /******** UI Elements ********/
 
+if (window.PW_statusbar) PW_statusbar.remove();
 window.PW_statusbar = document.createElement("div");
-PW_statusbar.classList.add('PW-statusbar');
+PW_statusbar.classList.add('PW');
 
 PW_statusbar.innerHTML= `
-    <input id="PW-repl" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-    <span id="PW-page-object-model-filename" class="PW-statusbar-item" title="page object model filename"></span>
-    <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
-        <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
-        <label for="PW-record-checkbox" style="margin:8px"/>
-    </span>
+    <div class="PW-statusbar">
+        <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
+        <span id="PW-page-object-model-filename" class="PW-statusbar-item" title="page object model filename"></span>
+        <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
+            <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
+            <label for="PW-record-checkbox" style="margin:8px"/>
+        </span>
+    </div>
+    <div id="PW-eval-error">
+        <details>
+            <summary id="PW-eval-error-summary" style="visibility:collapsed">
+            </summary>
+            <div id = "PW-eval-error-details"></div>
+        </details>
+    </div>
 `;
+
 
 document.body.prepend(PW_statusbar);
 
 window.PW_repl = document.getElementById('PW-repl');
 PW_repl.addEventListener('keyup', event => (event.code || event.key) === 'Enter' ? PW_updateAndRerunLastCommand(PW_repl.value) : {})
 
+window.PW_eval_error = document.getElementById('PW-eval-error');
+PW_eval_error.style.display = "none";
+window.PW_eval_error_summary = document.getElementById('PW-eval-error-summary');
+window.PW_eval_error_details = document.getElementById('PW-eval-error-details');
+
+
+if (window.PW_tooltip) PW_tooltip.remove();
 var PW_tooltip = document.createElement("div");
 PW_tooltip.setAttribute('id', 'PW_tooltip');
 PW_tooltip.classList.add('PW-tooltip');
@@ -25,11 +43,11 @@ window.PW_tooltip = PW_tooltip;
 
 /******** behavior ********/
 
-window.PW_pages = {};
+if (window.PW_pages === undefined) window.PW_pages = {};
 var mouse_x = 0;
 var mouse_y = 0;
 
-var recordModeOn = false;
+if (recordModeOn === undefined) var recordModeOn = false;
 PW_config().then(c => window.config = c);
 
 function keyChord_toggleRecordMode(event) {
@@ -78,7 +96,7 @@ function updateTooltipPosition(x,y) {
 function mousemove_updateTooltip(event) {
     const element = document.elementFromPoint(event.x, event.y);
     if (element == null) return;
-    if (element.closest(".PW-statusbar")) return;
+    if (element.closest(".PW")) return;
 
     mouse_x = event.x;
     mouse_y = event.y;
@@ -100,7 +118,7 @@ async function recordModeClickHandler(event) {
 
     const element = document.elementFromPoint(event.x, event.y);
     if (element == null) return;
-    if (element.closest(".PW-statusbar")) return;
+    if (element.closest(".PW")) return;
 
     try {
         handlingClick = true;
@@ -134,9 +152,7 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
-    //var $ = document.querySelector.bind(document);
-    var $$ = document.querySelectorAll.bind(document);
-
+    const $$ = playwright ? playwright.$$ : document.querySelectorAll;
     if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
     
@@ -151,7 +167,7 @@ async function reload_page_object_model_elements() {
         if (!propertyRegex.test(prop)) continue;
 
         const selector = pageObject.page[prop];
-        const el = $$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
+        const el = playwright.$$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
 
         const overlayWrapperEl = document.createElement('div');
         overlayWrapperEl.style.display = 'grid';
@@ -173,4 +189,24 @@ async function reload_page_object_model_elements() {
         overlayWrapperEl.appendChild(overlayEl);
         window.PW_overlays.push(overlayEl);
     }
+}
+
+function reportError(summary, errorStack, doNotWrapDetails) {
+    if (summary === undefined && errorStack === undefined) {
+        PW_eval_error.style.display = "none";
+        return;
+    }
+    PW_eval_error.style.display = "block";
+    PW_eval_error_summary.innerHTML = summary;
+    PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
+}
+
+//pageObject selector evaluation requires `playwright` object, warn user if it's not available
+if (!window.playwright) {
+    reportError('Playwright live recorder will not run without additional configuration', `Add by setting environment variable
+<pre class="PW-pre">PWDEBUG=console</pre>
+or if using vscode ms-playwright.playwright extension, add the following into <a>.vscode/settings.json</a>
+<pre class="PW-pre">"playwright.env": {
+  "PWDEBUG": "console"
+},</pre>`, true);
 }
