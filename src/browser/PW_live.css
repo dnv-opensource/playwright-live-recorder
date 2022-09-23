@@ -1,4 +1,6 @@
 .PW {
+    position: sticky;
+    z-index: 2147483647;
     border-bottom:1px solid black;
 }
 
@@ -29,10 +31,8 @@
 }
 
 .PW-statusbar {
-    position: sticky;
     background: #eee;
     display: flex;
-    z-index: 2147483647;
 }
 
 .PW-statusbar-item {

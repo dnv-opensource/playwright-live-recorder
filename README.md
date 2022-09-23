@@ -8,7 +8,7 @@ Use at your discretion. This library is already very useful, but is certainly al
 
 >### **REPL** - Execute arbitrary code in testing context
 >**Immediate Feedback Loop**  
->Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.
+>Write and run the next lines of your test without needing to restart the test runner
 >
 ----
 >### **Recorder** - Generate idiomatic code
@@ -16,7 +16,8 @@ Use at your discretion. This library is already very useful, but is certainly al
 >Create rules to match your UI conventions and generate best practice code
 >
 >**Flexible and Iterative**  
->Never get boxed in by the recorder
+>Never get boxed in by the tool
+>
 ----
 >### **Page Object Model** - Seamless integration with best practices
 >**Discoverability**  
@@ -27,6 +28,7 @@ Use at your discretion. This library is already very useful, but is certainly al
 >
 >**Hierarchies and components**  
 >Support for nested page object model and component objects ⚠️ (partially implemented)
+>
 
 
 # Installation  
@@ -51,7 +53,7 @@ await PlaywrightLiveRecorder.start(page, s => eval(s));
 
 Run the test in headed mode
 
-> 💡 use vscode plugin `ms-playwright.playwright` and right click the `play` ![](docs/playwright-test-play-button.png) icon in the margin, click `Debug test` to run headed mode quickly for a single test
+> 💡 use vscode plugin `ms-playwright.playwright` and right click the play icon ![](docs/playwright-test-play-button.png) in the margin, click `Debug test` to run headed mode quickly for a single test
 
 > 💡 create a shortcut key of CTRL+ALT+SHIFT+R for command `Test: Debug Test at Cursor`
 
