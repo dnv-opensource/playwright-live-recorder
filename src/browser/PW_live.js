@@ -7,7 +7,7 @@ PW_statusbar.classList.add('PW');
 PW_statusbar.innerHTML= `
     <div class="PW-statusbar">
         <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" placeholder="page object model filename"></span>
+        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" placeholder="page object model filename" onclick="ensurePageObjectModelCreated()">
         <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
             <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
             <label for="PW-record-checkbox" style="margin:8px"/>
@@ -33,6 +33,7 @@ PW_eval_error.style.display = "none";
 window.PW_eval_error_summary = document.getElementById('PW-eval-error-summary');
 window.PW_eval_error_details = document.getElementById('PW-eval-error-details');
 
+window.PW_page_object_model_filename = document.getElementById('PW-page-object-model-filename');
 
 if (window.PW_tooltip) PW_tooltip.remove();
 var PW_tooltip = document.createElement("div");
@@ -126,10 +127,19 @@ async function recordModeClickHandler(event) {
         event.preventDefault();
         event.stopImmediatePropagation();
 
+        let newItemName;
         const result = document.PW_getRuleForElement(element);
-        if (result.onClick) result.onClick(element);
+        if (result.isPageObjectModel) pageObjectModelOnClick(element);
+        else if (config.pageObjectModel.enabled) {
+            newItemName = window.prompt('Page object model item name?');
+            if (newItemName != null) {
+                const selector = result.match(element);
+                await PW_appendToPageObjectModel(pageObjectFilePath, _buildPomCodeBlock(newItemName, selector));
+            }
+        }
+        if (newItemName != null) return;
+
         const resultOutput = result.output(result.match(element));
-        
         PW_repl.value = resultOutput;
         PW_repl.disabled = false;
         await window.PW_eval(resultOutput, true);
@@ -152,6 +162,7 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
+    if (!recordModeOn) return;
     const $$ = playwright ? playwright.$$ : document.querySelectorAll;
     if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
@@ -199,6 +210,25 @@ function reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "block";
     PW_eval_error_summary.innerHTML = summary;
     PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
+}
+
+async function ensurePageObjectModelCreated() {
+    await PW_ensurePageObjectModelCreated(pageObjectFilePath);
+}
+
+function pageObjectModelOnClick(el) {
+    const origPointerEvents = el.style.pointerEvents;
+    el.style.pointerEvents = 'none'; //make the pageObjectModel custom element not hit test visible
+    setTimeout(() => el.style.pointerEvents = origPointerEvents, 1000); //and then restore it
+}
+
+//todo: add flexibility - provide function impl template to be provided by the recorderRules
+function _buildPomCodeBlock(name, selector) {
+    return`
+    private static ${name}_selector = \`${selector}\`;
+    static ${name}(page: Page) { return page.locator(\`${selector}\`); }
+    
+`;
 }
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available

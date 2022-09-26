@@ -73,6 +73,11 @@
     padding: 0 0.5em;
 }
 
+#PW-page-object-model-filename {
+    border:0;
+    padding: 0 0.5em;
+}
+
 .PW-pre {
     background:black;
     color:white;

@@ -11,7 +11,7 @@
     "declaration": true,
 
     "strict": true,                        /* Enable all strict type-checking options. */
-    "types": ["node"],
+    "types": ["node", "jest"],
     "allowSyntheticDefaultImports": true,
 
     "skipLibCheck": true,                     /* Skip type checking of declaration files. */

@@ -1,5 +1,6 @@
 import * as _ from "lodash";
 import * as fs from "fs/promises";
+import * as nodePath from "node:path";
 import * as ts from "typescript";
 import * as chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
@@ -18,6 +19,9 @@ export interface PomEntry {
 export module pageObjectModel {
     export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
+        
+        await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path)));
+        await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock));
 
         const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
         
@@ -30,6 +34,7 @@ export module pageObjectModel {
         const pom = await _reload(path, config_pageObjectModel_path);
         TrackedPoms[pom.name] = pom;
         await _attemptLoadPom(pom, page);
+        await page.evaluate('reload_page_object_model_elements()');
     }
 
     export async function _attemptLoadPom(pom: PomEntry, page: Page) {
@@ -81,4 +86,39 @@ export module pageObjectModel {
             .replace(`export var ${className};`, exportReplacementText) //export module fixup
         return content;
     }
+
+    async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string) {
+        await _ensurePageObjectModelCreated(fullRelativePath, className);
+        try {
+            let content = await fs.readFile(fullRelativePath, 'utf-8');
+            const position_endOfClass = content.lastIndexOf('}');
+            const before = content.slice(0, position_endOfClass - 1);
+            const after = content.slice(position_endOfClass - 1);
+            content =  before + codeBlock + after;
+            await fs.writeFile(fullRelativePath, content);
+        } catch (error) {
+            /*todo: bubble up error */
+        }
+    }
+
+    async function _ensurePageObjectModelCreated(fullRelativePath: string, className: string) {
+        try {
+            await fs.mkdir(nodePath.dirname(fullRelativePath), { recursive: true });
+            await fs.writeFile(fullRelativePath, _defaultClassTemplate(className), { flag: 'wx'}); //if file is non-existant emit the standard template
+        } catch (error) {
+            if ((<any>error).code === 'EEXIST') return;
+            throw error;
+        }
+    }
+    function _defaultClassTemplate(className: string) {
+return `import { Page } from "@playwright/test";
+
+export class ${className} {
+
+}
+`;
+    }
+
+    function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
+    function fullRelativePath(path: string, config: { path: string }) { return nodePath.join(config.path, path); }
 }
