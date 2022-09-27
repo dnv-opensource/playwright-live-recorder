@@ -69,12 +69,11 @@ function toggleRecordMode(checked) {
         window.PW_tooltip.style.visibility = 'visible';
         if(config.pageObjectModel.enabled) {
             reload_page_object_model_elements();
-            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'visible';
         }
     } else {
         window.PW_tooltip.style.visibility = 'hidden';
         if(config.pageObjectModel.enabled) {
-            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'hidden';
+            clearPageObjectModelElements();
         }
     }
 }
@@ -129,8 +128,7 @@ async function recordModeClickHandler(event) {
 
         let newItemName;
         const result = document.PW_getRuleForElement(element);
-        if (result.isPageObjectModel) pageObjectModelOnClick(element);
-        else if (config.pageObjectModel.enabled) {
+        if (config.pageObjectModel.enabled && !result.isPageObjectModel) {
             newItemName = window.prompt('Page object model item name?');
             if (newItemName != null) {
                 const selector = result.match(element);
@@ -162,8 +160,7 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
-    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
-    window.PW_overlays = [];
+    clearPageObjectModelElements();
     
     //get current page object to reflect across
     pageObjectFilePath = await PW_urlToFilePath(window.location.href);
@@ -179,28 +176,27 @@ async function reload_page_object_model_elements() {
         if (!propertyRegex.test(prop)) continue;
 
         const selector = pageObject.page[prop];
-        const el = playwright.$$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
-
-        const overlayWrapperEl = document.createElement('div');
-        overlayWrapperEl.style.display = 'grid';
-
-        const overlayEl = document.createElement('div');
+        const matchingElements = playwright.$$(selector);
+        if (matchingElements.length > 1) {
+            //todo: show a warning somehow
+        }
+        const el = matchingElements[0];
 
         //todo: use a regex instead
         const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
         const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-        overlayEl.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        overlayEl.classList.add('PW-page-object-model-overlay');
-        
-        overlayEl.classList.add('PW-grid-first-cell');
-        el.classList.add('PW-grid-first-cell');
 
-        el.parentNode.insertBefore(overlayWrapperEl, el);
-        overlayWrapperEl.appendChild(el);
-        overlayWrapperEl.appendChild(overlayEl);
-        window.PW_overlays.push(overlayEl);
+        el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
+        el.setAttribute('data-box-shadow', el.style['box-shadow']);
+        el.style['box-shadow'] = "0 0 6px salmon";
+        PW_overlays.push(el);
     }
+}
+
+function clearPageObjectModelElements() {
+    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.style['box-shadow'] = el.getAttribute('data-box-shadow');
+    window.PW_overlays = [];
 }
 
 function reportError(summary, errorStack, doNotWrapDetails) {
@@ -211,12 +207,6 @@ function reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "block";
     PW_eval_error_summary.innerHTML = summary;
     PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
-}
-
-function pageObjectModelOnClick(el) {
-    const origPointerEvents = el.style.pointerEvents;
-    el.style.pointerEvents = 'none'; //make the pageObjectModel custom element not hit test visible
-    setTimeout(() => el.style.pointerEvents = origPointerEvents, 1000); //and then restore it
 }
 
 //todo: add flexibility - provide function impl template to be provided by the recorderRules

@@ -63,15 +63,14 @@ export module PlaywrightLiveRecorder {
         await repl.init(page, evalScope);
         await recorder.init(config.recorder, page);
 
+        await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
+        await page.addScriptTag({ path: config.debug.browserCodeJSPath }); //loading these scripts first, pageObjectModel.init watchers are dependent upon methods exposed here
+        await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
+
         if (config.pageObjectModel.enabled) {
             config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
             await pageObjectModel.init(config.pageObjectModel, page);
         }
-
-        await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
-
-        await page.addScriptTag({ path: config.debug.browserCodeJSPath });
-        await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 
