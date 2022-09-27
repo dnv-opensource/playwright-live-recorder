@@ -1,5 +1,6 @@
 import { Page } from "@playwright/test";
 import * as fs from "fs/promises";
+import { pageObjectModel } from "./pageObjectModel";
 
 //repl with write-to-test-file capabilities
 export module repl {
@@ -27,8 +28,8 @@ export module repl {
             const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;
             const matches = [...testFileSource.matchAll(importToRequireRegex)];
             const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
-
-            await evalScope(`${imports}\n${s}`);
+            const hotReloadedPomsSourceCode = pageObjectModel.hotReloadedPomsSourceCode();
+            await evalScope(`${imports}\n${hotReloadedPomsSourceCode}\n${s}`);
             await pageEvaluate(`reportError()`);
             if (record) {
                 await writeLineToTestFile(testCallingLocation, testEval, commandToOverwrite);
