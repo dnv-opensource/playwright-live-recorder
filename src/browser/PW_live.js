@@ -7,7 +7,7 @@ PW_statusbar.classList.add('PW');
 PW_statusbar.innerHTML= `
     <div class="PW-statusbar">
         <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" placeholder="page object model filename" onclick="ensurePageObjectModelCreated()">
+        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" title="page object model filename">
         <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
             <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
             <label for="PW-record-checkbox" style="margin:8px"/>
@@ -49,7 +49,13 @@ var mouse_x = 0;
 var mouse_y = 0;
 
 if (recordModeOn === undefined) var recordModeOn = false;
-PW_config().then(c => window.config = c);
+PW_config().then(c => {
+    window.config = c;
+    //functions serialize through as text, try to create the as functions once again
+    config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
+    config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
+    config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
+});
 
 function keyChord_toggleRecordMode(event) {
     if (!(event.ctrlKey && event.altKey && event.shiftKey && event.key === 'R')) return;
@@ -69,12 +75,11 @@ function toggleRecordMode(checked) {
         window.PW_tooltip.style.visibility = 'visible';
         if(config.pageObjectModel.enabled) {
             reload_page_object_model_elements();
-            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'visible';
         }
     } else {
         window.PW_tooltip.style.visibility = 'hidden';
         if(config.pageObjectModel.enabled) {
-            for (const overlayEl of window.PW_overlays) overlayEl.style.visibility = 'hidden';
+            clearPageObjectModelElements();
         }
     }
 }
@@ -129,12 +134,11 @@ async function recordModeClickHandler(event) {
 
         let newItemName;
         const result = document.PW_getRuleForElement(element);
-        if (result.isPageObjectModel) pageObjectModelOnClick(element);
-        else if (config.pageObjectModel.enabled) {
+        if (config.pageObjectModel.enabled && !result.isPageObjectModel) {
             newItemName = window.prompt('Page object model item name?');
             if (newItemName != null) {
                 const selector = result.match(element);
-                await PW_appendToPageObjectModel(pageObjectFilePath, _buildPomCodeBlock(newItemName, selector));
+                await PW_appendToPageObjectModel(pageObjectFilePath,config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
             }
         }
         if (newItemName != null) return;
@@ -162,44 +166,44 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
-    if (!recordModeOn) return;
-    const $$ = playwright ? playwright.$$ : document.querySelectorAll;
-    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
-    window.PW_overlays = [];
+    clearPageObjectModelElements();
     
     //get current page object to reflect across
     pageObjectFilePath = await PW_urlToFilePath(window.location.href);
-    document.getElementById("PW-page-object-model-filename").value = pageObjectFilePath;
+    PW_page_object_model_filename.value = pageObjectFilePath;
+
+    if (!recordModeOn) return;
+
     const pageObject = window.PW_pages[pageObjectFilePath];
     if (pageObject === undefined) return;
 
     const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
     for (var prop in pageObject.page) {
-        if (!propertyRegex.test(prop)) continue;
+        const selectorMethodName = propertyRegex.exec(prop)?.[1];
+        if (!selectorMethodName) continue;
 
         const selector = pageObject.page[prop];
-        const el = playwright.$$(selector)[0]; //todo: check that there's only one element, otherwise highlight in error
-
-        const overlayWrapperEl = document.createElement('div');
-        overlayWrapperEl.style.display = 'grid';
-
-        const overlayEl = document.createElement('div');
-
-        //todo: use a regex instead
-        const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
+        const matchingElements = playwright.$$(selector);
+        if (matchingElements.length > 1) {
+            //todo: show a warning somehow
+        }
+        if (matchingElements.length === 0) {
+            console.info(`could not find element for selector ${selector}. skipping.`);
+            continue;
+        }
+        const el = matchingElements[0];
         const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-        overlayEl.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        overlayEl.classList.add('PW-page-object-model-overlay');
-        
-        overlayEl.classList.add('PW-grid-first-cell');
-        el.classList.add('PW-grid-first-cell');
 
-        el.parentNode.insertBefore(overlayWrapperEl, el);
-        overlayWrapperEl.appendChild(el);
-        overlayWrapperEl.appendChild(overlayEl);
-        window.PW_overlays.push(overlayEl);
+        el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
+        config.pageObjectModel.overlay.on(el);
+        PW_overlays.push(el);
     }
+}
+
+function clearPageObjectModelElements() {
+    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
+    window.PW_overlays = [];
 }
 
 function reportError(summary, errorStack, doNotWrapDetails) {
@@ -210,25 +214,6 @@ function reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "block";
     PW_eval_error_summary.innerHTML = summary;
     PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
-}
-
-async function ensurePageObjectModelCreated() {
-    await PW_ensurePageObjectModelCreated(pageObjectFilePath);
-}
-
-function pageObjectModelOnClick(el) {
-    const origPointerEvents = el.style.pointerEvents;
-    el.style.pointerEvents = 'none'; //make the pageObjectModel custom element not hit test visible
-    setTimeout(() => el.style.pointerEvents = origPointerEvents, 1000); //and then restore it
-}
-
-//todo: add flexibility - provide function impl template to be provided by the recorderRules
-function _buildPomCodeBlock(name, selector) {
-    return`
-    private static ${name}_selector = \`${selector}\`;
-    static ${name}(page: Page) { return page.locator(\`${selector}\`); }
-    
-`;
 }
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available

@@ -4,7 +4,6 @@ import { recorder } from "./recorder";
 import * as fs from "fs/promises";
 import { repl } from "./repl";
 import { PlaywrightLiveRecorderConfig } from "./types";
-
 export module PlaywrightLiveRecorder {
     export const config : PlaywrightLiveRecorderConfig = {
         recorder: {
@@ -24,6 +23,7 @@ export module PlaywrightLiveRecorder {
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                 .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
                  + '_page.ts',
@@ -32,11 +32,44 @@ export module PlaywrightLiveRecorder {
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                 .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
                  + '_page.ts',
             /** @remarks Use this to find list of all selectors, and lookup property from selector @default /(.+)_selector/*/
             propertySelectorRegex: /(.+)_selector/,
+            /** @default (className) => 
+            `import { Page } from "@playwright/test";
+
+            export class ${className} {
+
+            }`,*/
+            generateClassTemplate: (className) => 
+`import { Page } from "@playwright/test";
+
+export class ${className} {
+
+}`,
+            /** @default  (name, selector) => 
+            `    private static ${name}_selector = \`${selector}\`;\r\n` + 
+            `    static ${name}(page: Page) { return page.locator(\`this.${name}_selector\`); }\r\n\r\n`,
+             */
+            generatePropertyTemplate: (name, selector) => 
+            `    private static ${name}_selector = \`${selector}\`;\r\n` + 
+            `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
+            overlay: {
+                /** @default (el) => {
+                    el.setAttribute('data-box-shadow', el.style.boxShadow);
+                    el.style.boxShadow = "0 0 6px salmon";
+                },
+                */
+                on: (el) => {
+                    el.setAttribute('data-box-shadow', el.style.boxShadow);
+                    el.style.boxShadow = "0 0 6px salmon";
+                },
+                /** @default (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '', */
+                off: (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '',
+            }
         },
         debug: {
             /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.js' */
@@ -61,15 +94,14 @@ export module PlaywrightLiveRecorder {
         await repl.init(page, evalScope);
         await recorder.init(config.recorder, page);
 
+        await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
+        await page.addScriptTag({ path: config.debug.browserCodeJSPath }); //loading these scripts first, pageObjectModel.init watchers are dependent upon methods exposed here
+        await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
+
         if (config.pageObjectModel.enabled) {
             config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
             await pageObjectModel.init(config.pageObjectModel, page);
         }
-
-        await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
-
-        await page.addScriptTag({ path: config.debug.browserCodeJSPath });
-        await page.addStyleTag({ path: config.debug.browserCodeCSSPath });
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 

@@ -10,7 +10,7 @@ export module repl {
         //get stacktrace to find startLiveCoding calling location (file and line)
         const callingLocationStr = new Error().stack!.split('\n')[3]; //line 0,1,2,3 3 is the immediate calling location of startLiveCoding
         const fileAndLineRegex = /    at (?:.+\()?(.+):(\d+):\d+\)?/.exec(callingLocationStr)!;
-        const testCallingLocation = { file: fileAndLineRegex[1], line: +fileAndLineRegex[2] };
+        const testCallingLocation = { file: fileAndLineRegex[1], line: +fileAndLineRegex[2] - 1 };
 
         await page.exposeFunction('PW_eval', (testEval: string, record = false) => repl.TestingContext_eval(testCallingLocation, evalScope, (str: string) => page.evaluate(str), testEval, record));
 
@@ -45,7 +45,7 @@ export module repl {
             }
 
             if (record) {
-                await writeLineToTestFile(testCallingLocation, `//${testEval} // failed to execute`, commandToOverwrite);
+                await writeLineToTestFile(testCallingLocation, `//${testEval}`, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
                 lastCommand = testEval;
             }
@@ -53,18 +53,16 @@ export module repl {
     }
 
     export async function writeLineToTestFile(testCallingLocation: { file: string, line: number }, str: string, commandToOverwrite: string | undefined = undefined) {
-        const t = testCallingLocation; //alias for shorthand below
-
         //todo: this code is ugly and cumbersome, find a more idomatic way to track recorded lines and splice file content
         const lastCommandLines = lastCommand?.split(_NEWLINE).length;
         if (commandToOverwrite) commandLineCount -= lastCommandLines;
-        const lineNum = t.line + commandLineCount;
-        const fileContents = await fs.readFile(t.file, 'utf-8');
+        const lineNum = testCallingLocation.line + commandLineCount;
+        const fileContents = await fs.readFile(testCallingLocation.file, 'utf-8');
         const lines = fileContents.split(_NEWLINE);
         const linesToOverwrite = commandToOverwrite ? lastCommandLines : 0;
         lines.splice(lineNum, linesToOverwrite, '    ' + str);
         const newFileContent = lines.join('\n');
-        await fs.writeFile(t.file, newFileContent);
+        await fs.writeFile(testCallingLocation.file, newFileContent);
     }
     const _NEWLINE = /\r\n|\n|\r/;
 }

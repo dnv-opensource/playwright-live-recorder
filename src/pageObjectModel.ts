@@ -20,8 +20,8 @@ export module pageObjectModel {
     export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
         
-        await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path)));
-        await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock));
+        await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
+        await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock, config));
 
         const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
         
@@ -56,7 +56,7 @@ export module pageObjectModel {
 
     export async function _reload(path: string, config_pageObjectModel_path: string) {
         const fileContents = await fs.readFile(`${config_pageObjectModel_path}${path}`, { encoding: 'utf8' });
-        const className = /\\([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
+        const className = /\\?([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
 
         const pom = _transpile(path.replaceAll('\\', '/'), className, fileContents);
         return pom;
@@ -87,8 +87,8 @@ export module pageObjectModel {
         return content;
     }
 
-    async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string) {
-        await _ensurePageObjectModelCreated(fullRelativePath, className);
+    async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string, config: { generateClassTemplate: (className: string) => string}) {
+        await _ensurePageObjectModelCreated(fullRelativePath, className, config);
         try {
             let content = await fs.readFile(fullRelativePath, 'utf-8');
             const position_endOfClass = content.lastIndexOf('}');
@@ -101,24 +101,16 @@ export module pageObjectModel {
         }
     }
 
-    async function _ensurePageObjectModelCreated(fullRelativePath: string, className: string) {
+    async function _ensurePageObjectModelCreated(fullRelativePath: string, className: string, config: { generateClassTemplate: (className: string) => string}) {
         try {
             await fs.mkdir(nodePath.dirname(fullRelativePath), { recursive: true });
-            await fs.writeFile(fullRelativePath, _defaultClassTemplate(className), { flag: 'wx'}); //if file is non-existant emit the standard template
+            await fs.writeFile(fullRelativePath, config.generateClassTemplate(className), { flag: 'wx'}); //if file is non-existant emit the standard template
         } catch (error) {
             if ((<any>error).code === 'EEXIST') return;
             throw error;
         }
     }
-    function _defaultClassTemplate(className: string) {
-return `import { Page } from "@playwright/test";
-
-export class ${className} {
-
-}
-`;
-    }
-
+    
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
     function fullRelativePath(path: string, config: { path: string }) { return nodePath.join(config.path, path); }
 }
