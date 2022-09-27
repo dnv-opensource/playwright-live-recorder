@@ -45,7 +45,7 @@ export module repl {
             }
 
             if (record) {
-                await writeLineToTestFile(testCallingLocation, `//${testEval} // failed to execute`, commandToOverwrite);
+                await writeLineToTestFile(testCallingLocation, `//${testEval}`, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
                 lastCommand = testEval;
             }

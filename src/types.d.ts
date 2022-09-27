@@ -13,6 +13,12 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     baseUrl: string|undefined,
     urlToFilePath: (url: string) => string,
     propertySelectorRegex: RegExp,
+    generateClassTemplate: (className: string) => string,
+    generatePropertyTemplate: (name: string, selector: string) => string,
+    overlay: {
+        on: (el: HTMLElement) => void,
+        off: (el: HTMLElement) => void,
+    }
 }
 
 type PlaywrightLiveRecorderConfig_recorder = {

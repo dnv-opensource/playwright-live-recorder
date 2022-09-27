@@ -4,7 +4,6 @@ import { recorder } from "./recorder";
 import * as fs from "fs/promises";
 import { repl } from "./repl";
 import { PlaywrightLiveRecorderConfig } from "./types";
-
 export module PlaywrightLiveRecorder {
     export const config : PlaywrightLiveRecorderConfig = {
         recorder: {
@@ -39,6 +38,38 @@ export module PlaywrightLiveRecorder {
                  + '_page.ts',
             /** @remarks Use this to find list of all selectors, and lookup property from selector @default /(.+)_selector/*/
             propertySelectorRegex: /(.+)_selector/,
+            /** @default (className) => 
+            `import { Page } from "@playwright/test";
+
+            export class ${className} {
+
+            }`,*/
+            generateClassTemplate: (className) => 
+`import { Page } from "@playwright/test";
+
+export class ${className} {
+
+}`,
+            /** @default  (name, selector) => 
+            `    private static ${name}_selector = \`${selector}\`;\r\n` + 
+            `    static ${name}(page: Page) { return page.locator(\`this.${name}_selector\`); }\r\n\r\n`,
+             */
+            generatePropertyTemplate: (name, selector) => 
+            `    private static ${name}_selector = \`${selector}\`;\r\n` + 
+            `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
+            overlay: {
+                /** @default (el) => {
+                    el.setAttribute('data-box-shadow', el.style.boxShadow);
+                    el.style.boxShadow = "0 0 6px salmon";
+                },
+                */
+                on: (el) => {
+                    el.setAttribute('data-box-shadow', el.style.boxShadow);
+                    el.style.boxShadow = "0 0 6px salmon";
+                },
+                /** @default (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '', */
+                off: (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '',
+            }
         },
         debug: {
             /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.js' */

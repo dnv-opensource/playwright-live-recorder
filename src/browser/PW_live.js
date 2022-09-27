@@ -49,7 +49,13 @@ var mouse_x = 0;
 var mouse_y = 0;
 
 if (recordModeOn === undefined) var recordModeOn = false;
-PW_config().then(c => window.config = c);
+PW_config().then(c => {
+    window.config = c;
+    //functions serialize through as text, try to create the as functions once again
+    config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
+    config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
+    config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
+});
 
 function keyChord_toggleRecordMode(event) {
     if (!(event.ctrlKey && event.altKey && event.shiftKey && event.key === 'R')) return;
@@ -132,7 +138,7 @@ async function recordModeClickHandler(event) {
             newItemName = window.prompt('Page object model item name?');
             if (newItemName != null) {
                 const selector = result.match(element);
-                await PW_appendToPageObjectModel(pageObjectFilePath, _buildPomCodeBlock(newItemName, selector));
+                await PW_appendToPageObjectModel(pageObjectFilePath,config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
             }
         }
         if (newItemName != null) return;
@@ -173,29 +179,30 @@ async function reload_page_object_model_elements() {
 
     const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
     for (var prop in pageObject.page) {
-        if (!propertyRegex.test(prop)) continue;
+        const selectorMethodName = propertyRegex.exec(prop)?.[1];
+        if (!selectorMethodName) continue;
 
         const selector = pageObject.page[prop];
         const matchingElements = playwright.$$(selector);
         if (matchingElements.length > 1) {
             //todo: show a warning somehow
         }
+        if (matchingElements.length === 0) {
+            console.info(`could not find element for selector ${selector}. skipping.`);
+            continue;
+        }
         const el = matchingElements[0];
-
-        //todo: use a regex instead
-        const selectorMethodName = prop.slice(0,prop.length-'_selector'.length);
         const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
 
         el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        el.setAttribute('data-box-shadow', el.style['box-shadow']);
-        el.style['box-shadow'] = "0 0 6px salmon";
+        config.pageObjectModel.overlay.on(el);
         PW_overlays.push(el);
     }
 }
 
 function clearPageObjectModelElements() {
-    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.style['box-shadow'] = el.getAttribute('data-box-shadow');
+    if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
     window.PW_overlays = [];
 }
 
@@ -207,15 +214,6 @@ function reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "block";
     PW_eval_error_summary.innerHTML = summary;
     PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
-}
-
-//todo: add flexibility - provide function impl template to be provided by the recorderRules
-function _buildPomCodeBlock(name, selector) {
-    return`
-    private static ${name}_selector = \`${selector}\`;
-    static ${name}(page: Page) { return page.locator(\`${selector}\`); }
-    
-`;
 }
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available
