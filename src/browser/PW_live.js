@@ -7,7 +7,7 @@ PW_statusbar.classList.add('PW');
 PW_statusbar.innerHTML= `
     <div class="PW-statusbar">
         <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" placeholder="page object model filename" onclick="ensurePageObjectModelCreated()">
+        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" title="page object model filename">
         <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
             <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
             <label for="PW-record-checkbox" style="margin:8px"/>
@@ -162,14 +162,15 @@ window.navigation.onnavigatesuccess = async () => await reload_page_object_model
 var pageObjectFilePath = '';
 
 async function reload_page_object_model_elements() {
-    if (!recordModeOn) return;
-    const $$ = playwright ? playwright.$$ : document.querySelectorAll;
     if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) el.parentNode.removeChild(el);
     window.PW_overlays = [];
     
     //get current page object to reflect across
     pageObjectFilePath = await PW_urlToFilePath(window.location.href);
-    document.getElementById("PW-page-object-model-filename").value = pageObjectFilePath;
+    PW_page_object_model_filename.value = pageObjectFilePath;
+
+    if (!recordModeOn) return;
+
     const pageObject = window.PW_pages[pageObjectFilePath];
     if (pageObject === undefined) return;
 
@@ -210,10 +211,6 @@ function reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "block";
     PW_eval_error_summary.innerHTML = summary;
     PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
-}
-
-async function ensurePageObjectModelCreated() {
-    await PW_ensurePageObjectModelCreated(pageObjectFilePath);
 }
 
 function pageObjectModelOnClick(el) {
