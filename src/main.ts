@@ -24,6 +24,7 @@ export module PlaywrightLiveRecorder {
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                 .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
                  + '_page.ts',
@@ -32,6 +33,7 @@ export module PlaywrightLiveRecorder {
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                 .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
                  + '_page.ts',
