@@ -56,7 +56,7 @@ export module pageObjectModel {
 
     export async function _reload(path: string, config_pageObjectModel_path: string) {
         const fileContents = await fs.readFile(`${config_pageObjectModel_path}${path}`, { encoding: 'utf8' });
-        const className = /\\([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
+        const className = /\\?([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
 
         const pom = _transpile(path.replaceAll('\\', '/'), className, fileContents);
         return pom;
