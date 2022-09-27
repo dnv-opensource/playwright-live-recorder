@@ -113,4 +113,15 @@ export module pageObjectModel {
     
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
     function fullRelativePath(path: string, config: { path: string }) { return nodePath.join(config.path, path); }
+
+    export function hotReloadedPomsSourceCode() {
+        var str = '';
+        for (const pomName in TrackedPoms) {
+            const pom = TrackedPoms[pomName];
+            
+            str += pom.content.replace(/\nwindow.PW_pages\[.*/, '') + '\n\n';
+        }
+
+        return str;
+    }
 }
