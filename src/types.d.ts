@@ -3,7 +3,7 @@ import { Page } from "@playwright/test"
 type PlaywrightLiveRecorderConfig = {
     recorder: PlaywrightLiveRecorderConfig_recorder,
     pageObjectModel: PlaywrightLiveRecorderConfig_pageObjectModel,
-    debug: PlaywrightLiveRecorderConfig_debug,
+    diagnostic: PlaywrightLiveRecorderConfig_diagnostic,
 };
 
 type PlaywrightLiveRecorderConfig_pageObjectModel = {
@@ -26,11 +26,29 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     urlToFilePath: (url: string) => string,
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector/*/
     propertySelectorRegex: RegExp,
+    /** @default (className) => 
+    `import { Page } from "@playwright/test";
+
+    export class ${className} {
+
+    }`,
+    */
     generateClassTemplate: (className: string) => string,
+    /** @default  (name, selector) => 
+    `    private static ${name}_selector = \`${selector}\`;\r\n` + 
+    `    static ${name}(page: Page) { return page.locator(\`this.${name}_selector\`); }\r\n\r\n`,
+    */
     generatePropertyTemplate: (name: string, selector: string) => string,
     overlay: {
+        /** @default 'salmon' */
         color: string,
+        /** @default (el, config) => {
+            el.setAttribute('data-background', el.style.background);
+            el.style.background = config.pageObjectModel.overlay.color;
+        },
+        */
         on: (el: HTMLElement, config: PlaywrightLiveRecorderConfig) => void,
+        /** @default (el) => el.style.background = el.getAttribute('data-background') ?? '', */
         off: (el: HTMLElement) => void,
     }
 }
@@ -40,13 +58,13 @@ type PlaywrightLiveRecorderConfig_recorder = {
     path: string,
 }
 
-type PlaywrightLiveRecorderConfig_debug = {
+type PlaywrightLiveRecorderConfig_diagnostic = {
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.js' */
     browserCodeJSPath: string,
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.css' */
     browserCodeCSSPath: string,
     /** @default false */
-    watchLibFiles: boolean,
+    hotReloadBrowserLibFiles: boolean,
 }
 
 //type AddScriptTag_Args = Parameters<Page['addScriptTag']>[0];
