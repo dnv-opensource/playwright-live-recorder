@@ -4,8 +4,13 @@ import { recorder } from "./recorder";
 import * as fs from "fs/promises";
 import { repl } from "./repl";
 import { PlaywrightLiveRecorderConfig } from "./types";
+import * as _ from "lodash";
+
+export type { PlaywrightLiveRecorderConfig };
+export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
+
 export module PlaywrightLiveRecorder {
-    export const config : PlaywrightLiveRecorderConfig = {
+    export const defaultConfig: PlaywrightLiveRecorderConfig = {
         recorder: {
             /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js' */
             path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js',
@@ -18,7 +23,7 @@ export module PlaywrightLiveRecorder {
             /** @default '**\/*_page.ts' */
             filenameConvention: '**/*_page.ts',
             /** @default (use.baseURL value from Playwright config) */
-            baseUrl: <string|undefined>undefined,
+            baseUrl: <string | undefined>undefined,
             /** @default (url: string) => url
                 .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                 .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
@@ -35,8 +40,8 @@ export module PlaywrightLiveRecorder {
                 .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
                 .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
                 .replace(/\/$/, '') // clear trailing /
-                 + '_page.ts',
-            /** @remarks Use this to find list of all selectors, and lookup property from selector @default /(.+)_selector/*/
+                + '_page.ts',
+            /** @remarks Use this to find list of all selectors, capture group 1 used as method name @default /(.+)_selector/*/
             propertySelectorRegex: /(.+)_selector/,
             /** @default (className) => 
             `import { Page } from "@playwright/test";
@@ -83,6 +88,9 @@ export class ${className} {
         }
     }
 
+    let config: PlaywrightLiveRecorderConfig;
+    export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: {}, debug: {} };
+
     /**
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
      */
@@ -92,6 +100,8 @@ export class ${className} {
             console.error('startLiveCoding called while running headless');
             return;
         }
+
+        config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
         await repl.init(page, evalScope);
         await recorder.init(config.recorder, page);
@@ -113,7 +123,7 @@ export class ${className} {
             (async () => { for await (const event of fs.watch(config.debug.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({ path: config.debug.browserCodeCSSPath }) : {}; })();  //fire-and-forget the watcher
             // tslint:enable: no-floating-promises
         }
-        
+
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
@@ -127,4 +137,27 @@ export class ${className} {
 
         return JSON.parse(result);
     }
+
+    export let configFilePath = '../../../../playwright-live-recorder.config.ts';
+    async function _configFromFile() {
+        try {
+            const fileConfig = (await import(configFilePath))?.default;
+            return <PlaywrightLiveRecorderConfig | undefined>fileConfig;
+        } catch (err) {
+            if ((<any>err).code === 'MODULE_NOT_FOUND') return;
+            console.error(err);
+        }
+    }
+
+    /** _.merge({}, defaultConfig, configFromFile, configOverrides) */
+    function _mergeConfig(defaultConfig: PlaywrightLiveRecorderConfig, configFromFile: PlaywrightLiveRecorderConfig | undefined, configOverrides: PlaywrightLiveRecorderConfig) {
+        return _.merge({}, defaultConfig, configFromFile, configOverrides);
+    }
 }
+
+type RecursivePartial<T> = {
+    [P in keyof T]?:
+    T[P] extends (infer U)[] ? RecursivePartial<U>[] :
+    T[P] extends object ? RecursivePartial<T[P]> :
+    T[P];
+};
