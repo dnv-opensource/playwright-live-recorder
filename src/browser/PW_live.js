@@ -99,22 +99,29 @@ function updateTooltipPosition(x,y) {
     PW_tooltip.style.top = y + yOffset + 'px';
 }
 
+window.mousemove_updateToolTip_running = false;
 function mousemove_updateTooltip(event) {
-    const element = document.elementFromPoint(event.x, event.y);
-    if (element == null) return;
+    if (mousemove_updateToolTip_running === true) return; //exit early so we don't sawmp the CPU
+    try {
+        mousemove_updateToolTip_running = true
+        const element = document.elementFromPoint(event.x, event.y);
+        if (element == null) return;
 
-    mouse_x = event.x;
-    mouse_y = event.y;
-    window.PW_tooltip.style.visibility = (!recordModeOn || element.closest(".PW")) ? 'hidden' : 'visible';
-    if (!recordModeOn) return;
+        mouse_x = event.x;
+        mouse_y = event.y;
+        window.PW_tooltip.style.visibility = (!recordModeOn || element.closest(".PW")) ? 'hidden' : 'visible';
+        if (!recordModeOn) return;
 
-    updateTooltipPosition(mouse_x, mouse_y);
-    
-    if (element == null) return;
-    if (window.el === element) return;
+        updateTooltipPosition(mouse_x, mouse_y);
+        
+        if (element == null) return;
+        if (window.el === element) return;
 
-    updateTooltipContents(element);
-    window.el = element;
+        updateTooltipContents(element);
+        window.el = element;
+    } finally {
+        mousemove_updateToolTip_running = false
+    }
 }
 
 var handlingClick = false;
