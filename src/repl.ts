@@ -27,10 +27,10 @@ export module repl {
             //ts.transpile(testFileSource) //todo: figure out how to use typescript to transpile `import` into `require` syntax
             const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;
             const matches = [...testFileSource.matchAll(importToRequireRegex)];
-            const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `const ${x[1]} = require(${x[2]});`).join('\n');
+            const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `var ${x[1]} = require(${x[2]});`).join('\n');
             const hotReloadedPomsSourceCode = pageObjectModel.hotReloadedPomsSourceCode();
             await evalScope(`${imports}\n${hotReloadedPomsSourceCode}\n${s}`);
-            await pageEvaluate(`reportError()`);
+            await pageEvaluate(`reportError(undefined, undefined, undefined)`);
             if (record) {
                 await writeLineToTestFile(testCallingLocation, testEval, commandToOverwrite);
                 commandLineCount += testEval.split('\n').length;
