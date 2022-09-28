@@ -4,7 +4,7 @@ import { recorder } from "./recorder";
 import * as fs from "fs/promises";
 import { repl } from "./repl";
 import { PlaywrightLiveRecorderConfig } from "./types";
-import _ from "lodash";
+import * as _ from "lodash";
 
 export type { PlaywrightLiveRecorderConfig };
 export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
@@ -138,11 +138,15 @@ export class ${className} {
         return JSON.parse(result);
     }
 
-    export let configFilePath = '../../../playwright-live-recorder.config.ts';
+    export let configFilePath = '../../../../playwright-live-recorder.config.ts';
     async function _configFromFile() {
-        try { await fs.access(configFilePath); } catch (err) { return; } //return early if file doesn't exist
-
-        return <PlaywrightLiveRecorderConfig>(await import(configFilePath)).default;
+        try {
+            const fileConfig = (await import(configFilePath))?.default;
+            return <PlaywrightLiveRecorderConfig | undefined>fileConfig;
+        } catch (err) {
+            if ((<any>err).code === 'MODULE_NOT_FOUND') return;
+            console.error(err);
+        }
     }
 
     /** _.merge({}, defaultConfig, configFromFile, configOverrides) */

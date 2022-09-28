@@ -12,7 +12,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "build": "tslint -p . && tsc && cpx \"src/**/*.{js,css,d.ts}\" dist",
+    "build": "tslint -p . && tsc && cpx \"src/**/*.{js,css,d.ts}\" dist && cpx \"example/**/*.*\" dist/example",
     "test": "jest"
   },
   "devDependencies": {
