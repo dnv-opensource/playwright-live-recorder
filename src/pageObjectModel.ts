@@ -5,6 +5,7 @@ import * as ts from "typescript";
 import * as chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
+import * as AsyncLock from "async-lock";
 
 const TrackedPoms: { [name: string]: PomEntry } = {};
 
@@ -17,6 +18,7 @@ export interface PomEntry {
 
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
+    const lock = new AsyncLock();
     export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
         
@@ -31,10 +33,13 @@ export module pageObjectModel {
     }
 
     export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {
-        const pom = await _reload(path, config_pageObjectModel_path);
-        TrackedPoms[pom.name] = pom;
-        await _attemptLoadPom(pom, page);
-        await page.evaluate('reload_page_object_model_elements()');
+        await lock.acquire('reload', async (release) => {
+            const pom = await _reload(path, config_pageObjectModel_path);
+            TrackedPoms[pom.name] = pom;
+            await _attemptLoadPom(pom, page);
+            await page.evaluate('reload_page_object_model_elements()');
+            release();
+        });
     }
 
     export async function _attemptLoadPom(pom: PomEntry, page: Page) {
@@ -50,7 +55,6 @@ export module pageObjectModel {
                 await _attemptLoadPom(otherPom, page);
         } catch (e) {
             console.error(`error calling page.addScriptTag for pom ${pom.name}`);
-            throw e; //todo: check if this causes recorder to stop working, if so, console log the error instead of rethrowing
         }
     }
 
@@ -97,7 +101,7 @@ export module pageObjectModel {
             content =  before + codeBlock + after;
             await fs.writeFile(fullRelativePath, content);
         } catch (error) {
-            /*todo: bubble up error */
+            console.error(error);
         }
     }
 
@@ -107,7 +111,7 @@ export module pageObjectModel {
             await fs.writeFile(fullRelativePath, config.generateClassTemplate(className), { flag: 'wx'}); //if file is non-existant emit the standard template
         } catch (error) {
             if ((<any>error).code === 'EEXIST') return;
-            throw error;
+            console.error(error);
         }
     }
     

@@ -51,7 +51,7 @@ var mouse_y = 0;
 if (recordModeOn === undefined) var recordModeOn = false;
 PW_config().then(c => {
     window.config = c;
-    //functions serialize through as text, try to create the as functions once again
+    //functions serialize through as text, try to create them as functions once again
     config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
     config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
     config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
@@ -99,22 +99,29 @@ function updateTooltipPosition(x,y) {
     PW_tooltip.style.top = y + yOffset + 'px';
 }
 
+window.mousemove_updateToolTip_running = false;
 function mousemove_updateTooltip(event) {
-    const element = document.elementFromPoint(event.x, event.y);
-    if (element == null) return;
+    if (mousemove_updateToolTip_running === true) return; //exit early so we don't sawmp the CPU
+    try {
+        mousemove_updateToolTip_running = true
+        const element = document.elementFromPoint(event.x, event.y);
+        if (element == null) return;
 
-    mouse_x = event.x;
-    mouse_y = event.y;
-    window.PW_tooltip.style.visibility = (!recordModeOn || element.closest(".PW")) ? 'hidden' : 'visible';
-    if (!recordModeOn) return;
+        mouse_x = event.x;
+        mouse_y = event.y;
+        window.PW_tooltip.style.visibility = (!recordModeOn || element.closest(".PW")) ? 'hidden' : 'visible';
+        if (!recordModeOn) return;
 
-    updateTooltipPosition(mouse_x, mouse_y);
-    
-    if (element == null) return;
-    if (window.el === element) return;
+        updateTooltipPosition(mouse_x, mouse_y);
+        
+        if (element == null) return;
+        if (window.el === element) return;
 
-    updateTooltipContents(element);
-    window.el = element;
+        updateTooltipContents(element);
+        window.el = element;
+    } finally {
+        mousemove_updateToolTip_running = false
+    }
 }
 
 var handlingClick = false;
@@ -196,7 +203,7 @@ async function reload_page_object_model_elements() {
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
 
         el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        config.pageObjectModel.overlay.on(el);
+        config.pageObjectModel.overlay.on(el, config);
         PW_overlays.push(el);
     }
 }
