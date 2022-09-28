@@ -51,7 +51,7 @@ var mouse_y = 0;
 if (recordModeOn === undefined) var recordModeOn = false;
 PW_config().then(c => {
     window.config = c;
-    //functions serialize through as text, try to create the as functions once again
+    //functions serialize through as text, try to create them as functions once again
     config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
     config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
     config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
@@ -196,7 +196,7 @@ async function reload_page_object_model_elements() {
         const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
 
         el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        config.pageObjectModel.overlay.on(el);
+        config.pageObjectModel.overlay.on(el, config);
         PW_overlays.push(el);
     }
 }

@@ -16,7 +16,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     generateClassTemplate: (className: string) => string,
     generatePropertyTemplate: (name: string, selector: string) => string,
     overlay: {
-        on: (el: HTMLElement) => void,
+        color: string,
+        on: (el: HTMLElement, config: PlaywrightLiveRecorderConfig) => void,
         off: (el: HTMLElement) => void,
     }
 }

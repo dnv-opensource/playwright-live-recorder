@@ -58,17 +58,19 @@ export class ${className} {
             `    private static ${name}_selector = \`${selector}\`;\r\n` + 
             `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
             overlay: {
-                /** @default (el) => {
-                    el.setAttribute('data-box-shadow', el.style.boxShadow);
-                    el.style.boxShadow = "0 0 6px salmon";
+                /** @default 'salmon' */
+                color: 'salmon',
+                /** @default (el, config) => {
+                    el.setAttribute('data-background', el.style.background);
+                    el.style.background = config.pageObjectModel.overlay.color;
                 },
                 */
-                on: (el) => {
-                    el.setAttribute('data-box-shadow', el.style.boxShadow);
-                    el.style.boxShadow = "0 0 6px salmon";
+                on: (el, config) => {
+                    el.setAttribute('data-background', el.style.background);
+                    el.style.background = config.pageObjectModel.overlay.color;
                 },
-                /** @default (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '', */
-                off: (el) => el.style.boxShadow = el.getAttribute('data-box-shadow') ?? '',
+                /** @default (el) => el.style.background = el.getAttribute('data-background') ?? '', */
+                off: (el) => el.style.background = el.getAttribute('data-background') ?? '',
             }
         },
         debug: {
