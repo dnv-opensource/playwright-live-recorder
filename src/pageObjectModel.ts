@@ -7,6 +7,11 @@ import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 import * as AsyncLock from "async-lock";
 
+let state: {
+    config: PlaywrightLiveRecorderConfig_pageObjectModel,
+    page: Page,
+} = <any>{};
+const TrackedPaths: Set<string> = new Set<string>();
 const TrackedPoms: { [name: string]: PomEntry } = {};
 
 export interface PomEntry {
@@ -20,6 +25,7 @@ export interface PomEntry {
 export module pageObjectModel {
     const lock = new AsyncLock();
     export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
+        state = {config, page};
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
@@ -34,6 +40,7 @@ export module pageObjectModel {
 
     export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {
         await lock.acquire('reload', async (release) => {
+            TrackedPaths.add(path);
             const pom = await _reload(path, config_pageObjectModel_path);
             TrackedPoms[pom.name] = pom;
             await _attemptLoadPom(pom, page);
@@ -127,5 +134,11 @@ export module pageObjectModel {
         }
 
         return str;
+    }
+
+    export async function reloadAll(configPath: string, page: Page) {
+        for (const path in TrackedPaths) {
+            await pageObjectModel.reload(path, configPath, page);
+        }
     }
 }
