@@ -1,5 +1,5 @@
 # **playwright-live-recorder**
-`A recorder for that that works with page object models, and supports hot module reloading and execution of arbitrary code within your test - `**`as they all should`**
+`A recorder that works with page object models, and supports hot module reloading and execution of arbitrary code within your test at runtime - `**`as they all should`**
 
 ### 🛑 Note: this library is incomplete, and in active development 🛑
 Use at your discretion. This library is already very useful, but is certainly also riddled with bugs.
