@@ -1,34 +1,15 @@
-# playwright-live-recorder
+# **playwright-live-recorder**
+`A recorder for that that works with page object models, and supports hot module reloading and execution of arbitrary code within your test - `**`as they all should`**
 
-## 🛑 Warning: this library is incomplete, and in active development 🛑
+### 🛑 Note: this library is incomplete, and in active development 🛑
 Use at your discretion. This library is already very useful, but is certainly also riddled with bugs.
 
-![Playwright live recorder design](docs/playwright-live-recorder-title-screen.png "Playwright live recorder design")
-# Features
+----
 
->### **REPL** - Execute arbitrary code in testing context
->**Immediate Feedback Loop**  
->Write and run the next lines of your test without needing to restart the test runner
->
-----
->### **Recorder** - Generate idiomatic code
->**Powerfully Tailored**  
->Create rules to match your UI conventions and generate best practice code
->
->**Flexible and Iterative**  
->Never get boxed in by the tool
->
-----
->### **Page Object Model** - Seamless integration with best practices
->**Discoverability**  
->Overlays existing POM elements onscreen, clicking them generates idiomatic code
->
->**Building out the POM**  
->Click elements on screen to name and add them to the POM 🛑 (not yet implemented)
->
->**Hierarchies and components**  
->Support for nested page object model and component objects ⚠️ (partially implemented)
->
+
+![Playwright live recorder design](docs/create_page_object_models_effortlessly.png "Playwright live recorder design")
+
+`todo: create video and add link demonstrating usage`
 
 
 # Installation  
@@ -40,18 +21,32 @@ or npm
 ```Shell
 npm install -D @dnvgl/playwright-live-recorder
 ```
-additional requirements: @playwright/test  
-`todo: figure out appropriate dev/peer/direct dependency on @playwright/test`
+
+Expose playwright's selectors for use within this library:
+> if using vscode  
+> create the file `.vscode/settings.json`
+``` json
+{
+    "playwright.env": {
+        "PWDEBUG": "console"
+      },
+}
+```
+> otherwise, set PWDEBUG=console in your shell before executing the test in headed mode
+
+Additional requirements: @playwright/test
 
 # Usage (Test Code)
 
 In a playwrite test, add this line at the end of the playwright test you want to continue recording
 ``` ts
-await PlaywrightLiveRecorder.start(page, s => eval(s));
 //recorded lines will be inserted here
+await PlaywrightLiveRecorder.start(page, s => eval(s));
 ```
 
 Run the test in headed mode
+
+💡 denote tips, not requirements.
 
 > 💡 use vscode plugin `ms-playwright.playwright` and right click the play icon ![](docs/playwright-test-play-button.png) in the margin, click `Debug test` to run headed mode quickly for a single test
 
@@ -63,63 +58,41 @@ Newly recorded test lines are inserted into test file.
 
 # Usage (Browser)
 
-## **Record and REPL**
-Playwright live recorder adds a control bar to the top of the browser page.
+> Playwright live recorder adds a control bar to the top of the browser page.
 > ![Playwright live recorder sticky bar](docs/control-bar.png "Playwright live recorder sticky bar")  
-> In the top right corner is `Record` ⚪/🔴 record can be toggled off/on by clicking the icon, or pressing CTRL+ALT+SHIFT+R  
+> * The first box allows executing code directly within the test context
+> * The second label is the page object model path+filename
+> * The `Record` ⚪/🔴 record can be toggled off/on by clicking the icon, or pressing CTRL+ALT+SHIFT+R  
+> When record is toggled on a hover tooltip is positioned next to the cursor showing the code that will be generated 
 >> 💡 if the recorder blocks your testing session, work past it by toggling record off, clicking, then toggling it back on
 
-> When record is toggled on a hover tooltip is positioned next to the cursor showing the selector that will be used.  
-> Clicking will generate code using the `RecorderRules`, execute it, and insert it into your test file.  
-> ![Playwright live recorder sticky bar](docs/example-page.png "Playwright live recorder sticky bar")  
-> The generated code is displayed in the Text Input in the top left of the control bar.  
-> This code may be modified, press &lt;Enter&gt; to re-execute and modify in place in your test  
->> 💡 if the generated code fails to execute it will be inserted into your test file commented out.  
->> you may keep updating and re-evaluating until it succeeds, or comment it out yourself and add whatever comment you want on the end
 
-> 💡 Playwright Live Recorder comes out-of-the-box with a small set of recorder rules (conventions). These are completely configurable/overridable. See [src/browser/PW_live_recorderRules.js](src/browser/PW_live_recorderRules.js) for the default set. RecorderRules file path may be overridden by setting `PlaywrightLiveRecorder.config.recorder.path = 'your/new/recorderRules.js'`
+## **Recording**
 
-> ### 🔍🔄
-> to aid in live development, recorderRules file is watched and immediately reloaded in browser when changes are saved
+> With record toggled on, click an element to add it to your test
+> * If the element is not part of the Page Object Model, you will be prompted to give it a name
+>   * Press enter and the new property will be added to the page object model file, and the element will highlight (default: salmon color), to indicate it's a part of the page object model
+>   * Press [esc] to skip adding to the page object model, and the code will be added directly to your test
+> * If the element is part of the Page Object Model, it will already be highlighted salmon color
+>   * Clicking it will add a call to the page object model method to your test
 
-## **Page Object Model**
-The label to the left of the 🔴 record button shows the page object model path+filename
+> After clicking an element, the test code will be executed and added to your test file  
+> The [Playwright Live Recorder] input box will be filled with the last executed line of code  
+> Modify the code and press enter modify and re-run the last line of the test
+>> 💡 This is useful to change a `.click()` call to a `.fill()`, or to wrap an `expect` around the element you just clicked.  
+>> Another powerful workflow is to edit the page object model function, save the file, and re-execute the last line by pressing &lt;enter&gt; in the input box.  
+>> You can keep iterating this way until the function implementation is correct.
 
-If this file exists in your test project Playwright Live Recorder will attempt to load and transpile into the browser session.
+<br/>
+<br/>
+<br/>
+<br/>
 
-Page model objects are reflected across looking for the convention
-``` ts
-static propertyName_selector = 'selector text here';
-static propertyName(page: Page) { return page.locator(this.propertyName_selector); }
-```
-the *_selector pieces are used to highlight elements in the page. When clicked it will call the associated pom function in your test code
-
-adding this code to the page object model file  
-
-``` ts
-//docs/intro_page.ts
-import { Page } from "@playwright/test";
-
-export class intro_page {
-    static searchBox_selector = '[aria-label="Search"]';
-    static searchBox(page: Page) { return page.locator(this.searchBox_selector); }
-}
-```
-Results in this page object model selector overlay.  
-Clicking it will generate the code it shows.
-> ![Playwright live recorder sticky bar](docs/example-page-object-model.png "Playwright live recorder sticky bar")  
-
-> ### 🔍🔄
-> to aid in live development, page object model files are watched and immediately reloaded in browser when changes are saved
-
-
+# Other Notes...
 > ### ⚠️ this is a work in progress  
 > not yet implemented:
 > * nested page object models (partially implemented)
-> * recorder authors new page object model files
-> * recorder adds to existing page object model files
-> * tricks to execute newly authored code in testing context
-
+> * full support for non-SPA sites
 
 ## **Troubleshooting**
 > vscode
@@ -132,7 +105,6 @@ Clicking it will generate the code it shows.
 >   * add breakpoints to see what's going on/wrong
 > * don't be afraid to use the console to try evaluating things and poke around
 
-# Other Notes
 
 This project is in it's infancy, but already looks very promising.  
 I'm sure you're able to break it, I'm more interested in how far we can get by trying to work _with_ it.  
