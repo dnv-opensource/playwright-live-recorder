@@ -56,7 +56,7 @@ export class ${className} {
     }
 
     let config: PlaywrightLiveRecorderConfig;
-    export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: {}, debug: {} };
+    export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: { overlay: {} }, diagnostic: {} };
 
     /**
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
@@ -111,7 +111,7 @@ export class ${className} {
         return JSON.parse(result);
     }
 
-    export let configFilePath = '../../../../playwright-live-recorder.config.ts';
+    export let configFilePath = '../../../../live-recorder.config.ts';
     async function _configFromFile() {
         try {
             const fileConfig = (await import(configFilePath))?.default;

@@ -198,13 +198,14 @@ async function reload_page_object_model_elements() {
             console.info(`could not find element for selector ${selector}. skipping.`);
             continue;
         }
-        const el = matchingElements[0];
-        const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
-        const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-
-        el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-        config.pageObjectModel.overlay.on(el, config);
-        PW_overlays.push(el);
+        for (const el of matchingElements) {
+            const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
+            const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
+    
+            el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
+            config.pageObjectModel.overlay.on(el, config);
+            PW_overlays.push(el);
+        }
     }
 }
 
