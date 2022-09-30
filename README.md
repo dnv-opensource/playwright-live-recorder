@@ -1,13 +1,10 @@
-# **playwright-live-recorder**
-`A recorder that works with page object models, and supports hot module reloading and execution of arbitrary code within your test at runtime - `**`as they all should`**
-
 ### 🛑 Note: this library is incomplete, and in active development 🛑
 Use at your discretion. This library is already very useful, but is certainly also riddled with bugs.
 
 ----
 
 
-![Playwright live recorder design](docs/create_page_object_models_effortlessly.png "Playwright live recorder design")
+![Playwright live recorder infographic](docs/playwright-live-recorder-infographic.png "Playwright live recorder infographic")
 
 `todo: create video and add link demonstrating usage`
 
@@ -46,8 +43,6 @@ await PlaywrightLiveRecorder.start(page, s => eval(s));
 
 Run the test in headed mode
 
-💡 denote tips, not requirements.
-
 > 💡 use vscode plugin `ms-playwright.playwright` and right click the play icon ![](docs/playwright-test-play-button.png) in the margin, click `Debug test` to run headed mode quickly for a single test
 
 > 💡 create a shortcut key of CTRL+ALT+SHIFT+R for command `Test: Debug Test at Cursor`
@@ -82,31 +77,3 @@ Newly recorded test lines are inserted into test file.
 >> 💡 This is useful to change a `.click()` call to a `.fill()`, or to wrap an `expect` around the element you just clicked.  
 >> Another powerful workflow is to edit the page object model function, save the file, and re-execute the last line by pressing &lt;enter&gt; in the input box.  
 >> You can keep iterating this way until the function implementation is correct.
-
-<br/>
-<br/>
-<br/>
-<br/>
-
-# Other Notes...
-> ### ⚠️ this is a work in progress  
-> not yet implemented:
-> * nested page object models (partially implemented)
-> * full support for non-SPA sites
-
-## **Troubleshooting**
-> vscode
-> * run test with debug and set breakpoints in @dnvgl/playwright-live-recorder source
-> * watch the `Debug Console` output
-
-> browser
-> * open dev tools, use console, most variables/functions are prefixed with `PW_`
-> * sources - files are prefixed with `PW_`
->   * add breakpoints to see what's going on/wrong
-> * don't be afraid to use the console to try evaluating things and poke around
-
-
-This project is in it's infancy, but already looks very promising.  
-I'm sure you're able to break it, I'm more interested in how far we can get by trying to work _with_ it.  
-
-🛠️ This project has a glaring lack of expertise in a number of areas, assistance (especially in live typescript transpilation) is greatly appreciated!
