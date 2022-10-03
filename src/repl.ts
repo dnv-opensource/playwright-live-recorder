@@ -2,7 +2,6 @@ import { test, Page } from "@playwright/test";
 import * as ErrorStackParser from "error-stack-parser";
 import * as fs from "fs/promises";
 import { hotModuleReload } from "./hotModuleReload";
-import { pageObjectModel } from "./pageObjectModel";
 
 //repl with write-to-test-file capabilities
 export module repl {
@@ -50,10 +49,10 @@ export module repl {
         const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;
         const matches = [...testFileSource.matchAll(importToRequireRegex)];
         const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `var ${x[1]} = require(${x[2]});`).join('\n');
-        const hotReloadedPomsSourceCode = pageObjectModel.hotReloadedPomsSourceCode();
+        const deps = hotModuleReload.getDepsSource();
         try {
             await pageEvaluate(`PW_executing = true`);
-            await evalScope(`${imports}\n${hotReloadedPomsSourceCode}\n${s}`); //todo, figure out if 'state e.g. globalThis' is a thing within eval contexts, return state and keep to to preload for the next eval
+            await evalScope(`${imports}\n${deps}\n${s}`); //todo, figure out if 'state e.g. globalThis' is a thing within eval contexts, return state and keep to to preload for the next eval
         } finally {
             await pageEvaluate(`PW_executing = false`);
         }
