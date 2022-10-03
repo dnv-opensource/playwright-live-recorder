@@ -153,7 +153,7 @@ async function recordModeClickHandler(event) {
         const resultOutput = result.output(result.match(element));
         PW_repl.value = resultOutput;
         PW_repl.disabled = false;
-        await window.PW_eval(resultOutput, true);
+        await PW_appendToTest(resultOutput);
     } finally {
         handlingClick = false;
     }
