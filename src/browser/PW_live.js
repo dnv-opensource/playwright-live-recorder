@@ -124,39 +124,32 @@ function mousemove_updateTooltip(event) {
     }
 }
 
-var handlingClick = false;
 async function recordModeClickHandler(event) {
     if (!recordModeOn) return;
-    if (handlingClick) return;
+    if (window.PW_executing) return;
 
     const element = document.elementFromPoint(event.x, event.y);
     if (element == null) return;
     if (element.closest(".PW")) return;
 
-    try {
-        handlingClick = true;
+    event.preventDefault();
+    event.stopImmediatePropagation();
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
-
-        let newItemName;
-        const result = document.PW_getRuleForElement(element);
-        if (config.pageObjectModel.enabled && !result.isPageObjectModel) {
-            newItemName = window.prompt('Page object model item name?');
-            if (newItemName != null) {
-                const selector = result.match(element);
-                await PW_appendToPageObjectModel(pageObjectFilePath,config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
-            }
+    let newItemName;
+    const result = document.PW_getRuleForElement(element);
+    if (config.pageObjectModel.enabled && !result.isPageObjectModel) {
+        newItemName = window.prompt('Page object model item name?');
+        if (newItemName != null) {
+            const selector = result.match(element);
+            await PW_appendToPageObjectModel(pageObjectFilePath,config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
         }
-        if (newItemName != null) return;
-
-        const resultOutput = result.output(result.match(element));
-        PW_repl.value = resultOutput;
-        PW_repl.disabled = false;
-        await PW_appendToTest(resultOutput);
-    } finally {
-        handlingClick = false;
     }
+    if (newItemName != null) return;
+
+    const resultOutput = result.output(result.match(element));
+    PW_repl.value = resultOutput;
+    PW_repl.disabled = false;
+    await PW_appendToTest(resultOutput);
 }
 
 document.PW_getRuleForElement = function (el) {
@@ -214,7 +207,7 @@ function clearPageObjectModelElements() {
     window.PW_overlays = [];
 }
 
-function reportError(summary, errorStack, doNotWrapDetails) {
+function PW_reportError(summary, errorStack, doNotWrapDetails) {
     if (summary === undefined && errorStack === undefined) {
         PW_eval_error.style.display = "none";
         return;
@@ -226,7 +219,7 @@ function reportError(summary, errorStack, doNotWrapDetails) {
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available
 if (!window.playwright) {
-    reportError('Playwright live recorder will not run without additional configuration', `Add by setting environment variable
+    PW_reportError('Playwright live recorder will not run without additional configuration', `Add by setting environment variable
 <pre class="PW-pre">PWDEBUG=console</pre>
 or if using vscode ms-playwright.playwright extension, add the following into <a>.vscode/settings.json</a>
 <pre class="PW-pre">"playwright.env": {
