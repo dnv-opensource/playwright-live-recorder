@@ -18,7 +18,7 @@ export module repl {
         testCallingLocation = { file: testInfo.file, testLine: testFileSrcLines[testInfo.line - 1], executingLine: testFileSrcLines[stack.lineNumber! - 1] };
 
         // tslint:disable-next-line: no-floating-promises
-        (async () => { for await (const event of fs.watch(testCallingLocation.file)) event.eventType === 'change' ? await hotModuleReload.reloadTestFile(testCallingLocation.file, testCallingLocation.testLine, testCallingLocation.executingLine, s => _evalCore(testCallingLocation.file, evalScope, (str: string) => page.evaluate(str), s)) : {}; })();   //fire-and-forget the watcher
+        (async () => { for await (const event of fs.watch(testCallingLocation.file)) event.eventType === 'change' ? await hotModuleReload.reloadTestFile(testCallingLocation.file, testCallingLocation.testLine, testCallingLocation.executingLine, s => _evalCore(evalScope, (str: string) => page.evaluate(str), s)) : {}; })();   //fire-and-forget the watcher
 
         await page.exposeFunction('PW_appendToTest', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval));
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval, repl.lastCommand?.split(_NEWLINE)?.length ?? 0));
@@ -28,7 +28,7 @@ export module repl {
 
     export async function TestingContext_eval(t: TestCallingLocation, evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
         try {
-            await _evalCore(t.file, evalScope, pageEvaluate, testEval);
+            await _evalCore(evalScope, pageEvaluate, testEval);
             await pageEvaluate(`PW_reportError()`);
         } catch (error) {
             if (error instanceof Error) {
@@ -41,18 +41,10 @@ export module repl {
         }
     }
 
-    async function _evalCore(testFilename: string, evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
-        const s = testEval.replaceAll(/\bawait\b/g, ''); //hack - eval doesn't play well with awaits, ideally we'd transpile it into promises... but I don't know how to use `typescript` lib to do this
-        //prepend imports from local test file into eval scope
-        const testFileSource = await fs.readFile(testFilename, 'utf-8'); //todo: pass testFileSource into function since it's already loaded by the caller
-        //ts.transpile(testFileSource) //todo: figure out how to use typescript to transpile `import` into `require` syntax
-        const importToRequireRegex = /\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g;
-        const matches = [...testFileSource.matchAll(importToRequireRegex)];
-        const imports = matches/* .filter(x => x[2] !== libraryName) */.map(x => `var ${x[1]} = require(${x[2]});`).join('\n');
-        const deps = hotModuleReload.getDepsSource();
+    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
         try {
             await pageEvaluate(`PW_executing = true`);
-            await evalScope(`${imports}\n${deps}\n${s}`); //todo, figure out if 'state e.g. globalThis' is a thing within eval contexts, return state and keep to to preload for the next eval
+            await evalScope(testEval);
         } finally {
             await pageEvaluate(`PW_executing = false`);
         }
