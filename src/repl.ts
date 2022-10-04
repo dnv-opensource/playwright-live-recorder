@@ -1,6 +1,8 @@
 import { test, Page } from "@playwright/test";
+import * as chokidar from "chokidar";
 import * as ErrorStackParser from "error-stack-parser";
 import * as fs from "fs/promises";
+import * as nodePath from "node:path";
 import { hotModuleReload } from "./hotModuleReload";
 
 //repl with write-to-test-file capabilities
@@ -17,8 +19,9 @@ export module repl {
         const testFileSrcLines = (await fs.readFile(testInfo.file, 'utf-8')).split(_NEWLINE);
         testCallingLocation = { file: testInfo.file, testLine: testFileSrcLines[testInfo.line - 1], executingLine: testFileSrcLines[stack.lineNumber! - 1] };
 
-        // tslint:disable-next-line: no-floating-promises
-        (async () => { for await (const event of fs.watch(testCallingLocation.file)) event.eventType === 'change' ? await hotModuleReload.reloadTestFile(testCallingLocation.file, testCallingLocation.testLine, testCallingLocation.executingLine, s => _evalCore(evalScope, (str: string) => page.evaluate(str), s)) : {}; })();   //fire-and-forget the watcher
+        const watch = chokidar.watch(nodePath.resolve(testCallingLocation.file));
+        watch.on('add', async path => await hotModuleReload.init(path, testCallingLocation.testLine, testCallingLocation.executingLine));
+        watch.on('change', async path => await hotModuleReload.reloadTestFile(path, testCallingLocation.testLine, testCallingLocation.executingLine, s => _evalCore(evalScope, (str: string) => page.evaluate(str), s)));
 
         await page.exposeFunction('PW_appendToTest', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval));
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval, repl.lastCommand?.split(_NEWLINE)?.length ?? 0));

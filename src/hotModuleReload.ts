@@ -3,25 +3,24 @@ import * as nodePath from "node:path";
 
 export module hotModuleReload {
     let testFilename: string;
-    let testFnContents: string | undefined;
+    let testFnContents: string;
     
+    export async function init(filename: string, testFnDecl: string, executingLine: string) {
+        testFilename = filename;
+        testFnContents = (await _extractFnContents(filename, testFnDecl, executingLine))!;
+    }
+
     /** test file is a special case - we're not loading a module into the executing environment, instead we:
      * ensure all imports are included
      * given a test method starting line,
      * compare the new content with the old content to determine what needs to be executed
      */
     export async function reloadTestFile(filename: string, testFnDecl: string, executingLine: string, repl: (s: string) => Promise<void> | any) {
-        testFilename = filename;
-        if (testFnContents === undefined) { //first time in, nothing to execute, just cache it and return
-            testFnContents = await _extractFnContents(filename, testFnDecl, executingLine);
-            return;
-        }
-
         const newTestFnContents = await (_extractFnContents(filename, testFnDecl, executingLine)) ?? '';
 
         const blockToExecute = _getBlockToExecute(testFnContents, newTestFnContents);
         //get script preamble: all the dependencies declared before the blockToExecute
-
+        console.log({blockToExecute});
         await repl(`${_emitScriptPreamble(filename)}\n\n${_wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute))}`);
 
         testFnContents = newTestFnContents;
@@ -56,6 +55,16 @@ export module hotModuleReload {
         const wholeFunctionContents = fnBlock.slice(fnBlock.indexOf(fnDecl) + fnDecl.length, fnBlock.lastIndexOf('}') - 1).split(_NEWLINE);
         const functionContentsUpToExecutingLine = wholeFunctionContents.slice(0, wholeFunctionContents.indexOf(executingLine)).join('\n');
         return functionContentsUpToExecutingLine;
+    }
+
+    export function _extractImports(filename: string) {
+        //initialize the files in the project
+        const project = new Project();
+        const ast = project.addSourceFileAtPath(filename);
+
+        //find the test function block within the test file
+        const allImports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+        return allImports;
     }
 
     export function _emitScriptPreamble(filename: string) {

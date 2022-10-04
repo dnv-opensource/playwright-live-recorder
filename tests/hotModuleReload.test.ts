@@ -85,3 +85,9 @@ const {abc, def} = {abc: 123, def: 456, xyz: 789};`);
   expect(variables).toEqual(['varABC', 'letABC', 'constABC', 'abc', 'def']);
 
 });
+
+test('extract import statements', async() => {
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  const imports = hotModuleReload._extractImports(testFilename);
+  console.log({imports});
+});

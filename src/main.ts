@@ -1,7 +1,7 @@
 import { Page, test } from "@playwright/test";
 import { pageObjectModel } from "./pageObjectModel";
 import { recorder } from "./recorder";
-import * as fs from "fs/promises";
+import * as chokidar from "chokidar";
 import { repl } from "./repl";
 import { PlaywrightLiveRecorderConfig } from "./types";
 import * as _ from "lodash";
@@ -91,10 +91,8 @@ export class ${className} {
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 
         if (config.diagnostic.hotReloadBrowserLibFiles) {
-            // tslint:disable: no-floating-promises
-            (async () => { for await (const event of fs.watch(config.diagnostic.browserCodeJSPath)) event.eventType === 'change' ? await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath }) : {}; })();   //fire-and-forget the watcher
-            (async () => { for await (const event of fs.watch(config.diagnostic.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath }) : {}; })();  //fire-and-forget the watcher
-            // tslint:enable: no-floating-promises
+            const watch = chokidar.watch([config.diagnostic.browserCodeJSPath, config.diagnostic.browserCodeCSSPath]);
+            watch.on('change', async path => await page.addScriptTag({ path }));
         }
 
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
