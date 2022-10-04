@@ -6,14 +6,13 @@ test('hotModuleReload reloadTestFile', async () => {
   const testDecl = `test('simple test', async ({ page }) => {`;
   const executingLine = `    await PlaywrightLiveRecorder.start(page, s => eval(s));`;
   
-  await hotModuleReload.reloadTestFile('./tests/example-test-project/example.spec.before.ts', testDecl, executingLine, s => {});
+  await hotModuleReload.init('./tests/example-test-project/example.spec.before.ts', testDecl, executingLine);
   
   let newSrcBlock!: string;
   await hotModuleReload.reloadTestFile('./tests/example-test-project/example.spec.after.ts', testDecl, executingLine, s => newSrcBlock = s);
 
 
-  expect(newSrcBlock).toBe(
-`    await expect(page).toHaveTitle('Google');`);
+  expect(newSrcBlock).toEqual(`    await expect(page).toHaveTitle('Google');`);
 });
 
 test('hotModuleReload _getBlockToExecute', async () => {
@@ -26,7 +25,7 @@ test('hotModuleReload _getBlockToExecute', async () => {
   const expectedNewBlock =
 `    await expect(page).toHaveTitle('Google');`;
 
-  expect(blockToExecute).toBe(expectedNewBlock);
+  expect(blockToExecute).toEqual(expectedNewBlock);
 });
 
 

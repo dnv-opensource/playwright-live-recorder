@@ -21,17 +21,19 @@ export module repl {
 
         const watch = chokidar.watch(nodePath.resolve(testCallingLocation.file));
         watch.on('add', async path => await hotModuleReload.init(path, testCallingLocation.testLine, testCallingLocation.executingLine));
-        watch.on('change', async path => await hotModuleReload.reloadTestFile(path, testCallingLocation.testLine, testCallingLocation.executingLine, s => _evalCore(evalScope, (str: string) => page.evaluate(str), s)));
+        watch.on('change', async path => await hotModuleReload.reloadTestFile(path, testCallingLocation.testLine, testCallingLocation.executingLine, (imports: string, inlinedDependencies: string, codeBlock: string) => _evalCore(evalScope, (str: string) => page.evaluate(str), imports, inlinedDependencies, codeBlock)));
 
         await page.exposeFunction('PW_appendToTest', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval));
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval, repl.lastCommand?.split(_NEWLINE)?.length ?? 0));
 
+        //todo, refactor with hotModuleReload code
         await page.exposeFunction('PW_eval', async (testEval: string) => await repl.TestingContext_eval(testCallingLocation, evalScope, (str: string) => page.evaluate(str), testEval));
     }
 
     export async function TestingContext_eval(t: TestCallingLocation, evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
         try {
-            await _evalCore(evalScope, pageEvaluate, testEval);
+            const h = hotModuleReload;
+            await _evalCore(evalScope, pageEvaluate, h._importToRequireSyntax(h._extractImports(t.file)), h._emitInlinedDependencies(t.file), h._wrapAsyncAsPromise(testEval, h._extractVariableListFrom(testEval)));
             await pageEvaluate(`PW_reportError()`);
         } catch (error) {
             if (error instanceof Error) {
@@ -44,10 +46,10 @@ export module repl {
         }
     }
 
-    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
+    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, imports: string, inlinedDependencies: string, codeBlock: string) {
         try {
             await pageEvaluate(`PW_executing = true`);
-            await evalScope(testEval);
+            await evalScope(`${imports}\n\n${inlinedDependencies}\n\n${codeBlock}`);
         } finally {
             await pageEvaluate(`PW_executing = false`);
         }

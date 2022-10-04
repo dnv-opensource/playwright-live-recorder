@@ -1,13 +1,17 @@
-import { ts, Project } from "ts-morph";
+import { ts, Project, ImportDeclaration } from "ts-morph";
 import * as nodePath from "node:path";
 
 export module hotModuleReload {
     let testFilename: string;
     let testFnContents: string;
+    let inlinedDependencies: string;
+    let imports: ImportDeclaration[];
     
     export async function init(filename: string, testFnDecl: string, executingLine: string) {
         testFilename = filename;
         testFnContents = (await _extractFnContents(filename, testFnDecl, executingLine))!;
+        inlinedDependencies = _emitInlinedDependencies(filename);
+        imports = _extractImports(filename);
     }
 
     /** test file is a special case - we're not loading a module into the executing environment, instead we:
@@ -15,13 +19,13 @@ export module hotModuleReload {
      * given a test method starting line,
      * compare the new content with the old content to determine what needs to be executed
      */
-    export async function reloadTestFile(filename: string, testFnDecl: string, executingLine: string, repl: (s: string) => Promise<void> | any) {
+    export async function reloadTestFile(filename: string, testFnDecl: string, executingLine: string, repl: (imports: string, inlinedDependencies: string, codeBlock: string) => Promise<void> | any) {
         const newTestFnContents = await (_extractFnContents(filename, testFnDecl, executingLine)) ?? '';
 
         const blockToExecute = _getBlockToExecute(testFnContents, newTestFnContents);
-        //get script preamble: all the dependencies declared before the blockToExecute
+        //get script preamble: all test file imports, and inlined dependencies before the blockToExecute
         console.log({blockToExecute});
-        await repl(`${_emitScriptPreamble(filename)}\n\n${_wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute))}`);
+        await repl(_importToRequireSyntax(imports), inlinedDependencies, _wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute)));
 
         testFnContents = newTestFnContents;
     }
@@ -58,7 +62,6 @@ export module hotModuleReload {
     }
 
     export function _extractImports(filename: string) {
-        //initialize the files in the project
         const project = new Project();
         const ast = project.addSourceFileAtPath(filename);
 
@@ -67,15 +70,13 @@ export module hotModuleReload {
         return allImports;
     }
 
-    export function _emitScriptPreamble(filename: string) {
+    export function _emitInlinedDependencies(filename: string) {
         const testFilename = nodePath.resolve(filename);
   
-        let proj = new Project(); //todo: figure out options that make this faster...
-        proj.addSourceFileAtPath(testFilename);
-        const allFiles = proj.emitToMemory().getFiles().map(f => f.filePath.replace(/\.js$/, '.ts')); //get dependency graph in dependency order
+        let proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
 
-        proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
-        allFiles.forEach(path => proj.addSourceFileAtPath(path));
+        proj.addSourceFileAtPath(testFilename);
+        proj.resolveSourceFileDependencies();
         
         proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
         const r = proj.emitToMemory();
@@ -83,6 +84,7 @@ export module hotModuleReload {
         
         const ambientCode = files
             .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
+            .reverse()
             .map(f => `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`)
             .join('\n\n');
 
@@ -91,9 +93,12 @@ export module hotModuleReload {
 
     export function _wrapAsyncAsPromise(codeBlock: string, variables: string[]) {
         return `(async function() {
+  try {
 ${codeBlock}
-    //return { ${variables.join(', ')} };
     Object.assign(globalThis, { ${variables.join(', ')}});
+  } catch (err) {
+    console.error(err);
+  }
 })()`;
     }
 
@@ -108,6 +113,10 @@ ${codeBlock}
             return listOfVars;
         });
         return variableNames.flat();
+    }
+
+    export function _importToRequireSyntax(imports: ImportDeclaration[]) {
+        return imports.map(x => x.print().replace(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/, 'var $1 = require($2);')).join('\n');
     }
 
     const _NEWLINE = /\r\n|\n|\r/;
