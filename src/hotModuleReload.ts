@@ -27,6 +27,7 @@ export module hotModuleReload {
         //get script preamble: all test file imports, and inlined dependencies before the blockToExecute
         console.log({blockToExecute});
         imports = _extractImports(filename); //refresh imports
+        inlinedDependencies = _emitInlinedDependencies(filename); //refresh inlined dependencies - warning: slow, todo: incrementally update these based on file watcher
 
         const depsRelativePaths = [...inlinedDependencies].map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(testFilename), x.path)).replace(/\.js$/m, ''));
         await repl(
@@ -89,17 +90,18 @@ export module hotModuleReload {
         let proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
 
         proj.addSourceFileAtPath(testFilename);
-        proj.resolveSourceFileDependencies();
         
-        proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
         const r = proj.emitToMemory();
         const files = r.getFiles();
+        const allFiles = proj.emitToMemory().getFiles().map(f => f.filePath.replace(/\.js$/, '.ts')); //get dependency graph in dependency order
         
-        
+        proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
+        allFiles.forEach(path => proj.addSourceFileAtPath(path));
+        proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
+
         const inlinedDependencies = new Set(
         files
             .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
-            .reverse()
             .map((f, index) => ({path: f.filePath, src: `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`, index})));
 
         return inlinedDependencies;

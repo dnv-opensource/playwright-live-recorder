@@ -26,14 +26,13 @@ export module repl {
         await page.exposeFunction('PW_appendToTest', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval));
         await page.exposeFunction('PW_updateAndRerunLastCommand', async (testEval: string) => await repl.writeLineToTestFile(testCallingLocation, testEval, repl.lastCommand?.split(_NEWLINE)?.length ?? 0));
 
-        //todo, refactor with hotModuleReload code
         await page.exposeFunction('PW_eval', async (testEval: string) => await repl.TestingContext_eval(testCallingLocation, evalScope, (str: string) => page.evaluate(str), testEval));
     }
 
     export async function TestingContext_eval(t: TestCallingLocation, evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, testEval: string) {
         try {
             const h = hotModuleReload;
-            await _evalCore(evalScope, pageEvaluate, h._importToRequireSyntax(h._extractImports(t.file)), h._emitInlinedDependencies(t.file), h._wrapAsyncAsPromise(testEval, h._extractVariableListFrom(testEval)));
+            await _evalCore(evalScope, pageEvaluate, h._importToRequireSyntax(h._extractImports(t.file)), [...h._emitInlinedDependencies(t.file)].map(x => x.src).join('\n\n'), h._wrapAsyncAsPromise(testEval, h._extractVariableListFrom(testEval)));
             await pageEvaluate(`PW_reportError()`);
         } catch (error) {
             if (error instanceof Error) {
