@@ -8,11 +8,48 @@ test('hotModuleReload reloadTestFile', async () => {
   
   await hotModuleReload.init('./tests/example-test-project/example.spec.before.ts', testDecl, executingLine);
   
-  let newSrcBlock!: string;
-  await hotModuleReload.reloadTestFile('./tests/example-test-project/example.spec.after.ts', testDecl, executingLine, s => newSrcBlock = s);
+  let imports: string, inlinedDeps: string, codeBlock: string;
+  await hotModuleReload.reloadTestFile('./tests/example-test-project/example.spec.after.ts', testDecl, executingLine, (i, deps, src) => { imports = i; inlinedDeps = deps; codeBlock = src;});
 
 
-  expect(newSrcBlock).toEqual(`    await expect(page).toHaveTitle('Google');`);
+  expect(imports!).toEqual(
+`var { test, expect } = require('@playwright/test');
+var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');`);
+
+
+  expect(inlinedDeps!).toEqual(
+`//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/utility.js transpiled
+function createGuid() {
+    return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
+}
+async function fnPromise() {
+    return await Promise.resolve(createGuid());
+}
+
+
+//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.js transpiled
+class intro_page {
+    static title_selector = \`h1:has-text("Installation")\`;
+    static title(page) { return page.locator(this.title_selector); }
+    static home_selector = \`b:has-text("Playwright")\`;
+    static home(page) {
+        const iAmGuid = createGuid();
+        return page.locator(this.home_selector);
+    }
+}
+`);
+
+
+  expect(codeBlock!).toContain(`    await expect(page).toHaveTitle('Google');`);
+  expect(codeBlock!).toEqual(
+`(async function() {
+  try {
+    await expect(page).toHaveTitle('Google');
+    Object.assign(globalThis, { });
+  } catch (err) {
+    console.error(err);
+  }
+})()`);
 });
 
 test('hotModuleReload _getBlockToExecute', async () => {

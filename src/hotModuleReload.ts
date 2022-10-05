@@ -1,10 +1,11 @@
 import { ts, Project, ImportDeclaration } from "ts-morph";
 import * as nodePath from "node:path";
 
+type InlinedDependency = {path: string, src: string, index: number};
 export module hotModuleReload {
     let testFilename: string;
     let testFnContents: string;
-    let inlinedDependencies: string;
+    let inlinedDependencies: Set<InlinedDependency>;
     let imports: ImportDeclaration[];
     
     export async function init(filename: string, testFnDecl: string, executingLine: string) {
@@ -25,9 +26,21 @@ export module hotModuleReload {
         const blockToExecute = _getBlockToExecute(testFnContents, newTestFnContents);
         //get script preamble: all test file imports, and inlined dependencies before the blockToExecute
         console.log({blockToExecute});
-        await repl(_importToRequireSyntax(imports), inlinedDependencies, _wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute)));
+        imports = _extractImports(filename); //refresh imports
+
+        const depsRelativePaths = [...inlinedDependencies].map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(testFilename), x.path)).replace(/\.js$/m, ''));
+        await repl(
+            _importToRequireSyntax(imports.filter(i => !depsRelativePaths.includes(_getImportPath(i)))), 
+            [...inlinedDependencies].map(x => x.src).join('\n\n'), 
+            _wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute)));
 
         testFnContents = newTestFnContents;
+    }
+
+    function _getImportPath(i: ImportDeclaration) {
+        const importPath = i.getChildren()[3].print().replace(/['"`]/gm, '');
+        const normalizedImportPath = nodePath.normalize(importPath);
+        return normalizedImportPath;
     }
 
     export function _getBlockToExecute(oldSrc: string, newSrc: string) {
@@ -82,13 +95,14 @@ export module hotModuleReload {
         const r = proj.emitToMemory();
         const files = r.getFiles();
         
-        const ambientCode = files
+        
+        const inlinedDependencies = new Set(
+        files
             .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
             .reverse()
-            .map(f => `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`)
-            .join('\n\n');
+            .map((f, index) => ({path: f.filePath, src: `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`, index})));
 
-        return ambientCode;
+        return inlinedDependencies;
     }
 
     export function _wrapAsyncAsPromise(codeBlock: string, variables: string[]) {
