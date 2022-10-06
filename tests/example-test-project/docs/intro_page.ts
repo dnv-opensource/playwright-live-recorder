@@ -1,5 +1,5 @@
 import { Page } from "@playwright/test";
-import { createGuid } from '../utility';
+import { createGuid } from '../testHelpers';
 
 export class intro_page {
     private static title_selector = `h1:has-text("Installation")`;

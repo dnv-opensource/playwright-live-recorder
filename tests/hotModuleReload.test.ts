@@ -1,24 +1,138 @@
 import { ts, Project, ScriptTarget } from 'ts-morph';
+import * as typescript from 'typescript';
+import * as fs from 'node:fs/promises';
 import { hotModuleReload } from '../src/hotModuleReload';
 import * as nodePath from 'node:path';
+import { TestCallingLocation } from '../src/types';
+
+
+test('typescript transpile performance profiling', async () => {
+/*
+        const testFilename = nodePath.resolve(filename);
+  
+        let proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
+
+
+
+        proj.addSourceFileAtPath(testFilename);
+        proj.resolveSourceFileDependencies();
+        
+        proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
+        const r = proj.emitToMemory();
+        const files = r.getFiles();
+        
+        const ambientCode = files
+            .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
+            .reverse()
+            .map(f => `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`)
+            .join('\n\n');
+
+        return ambientCode;
+*/
+  const options = { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } };
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  
+  console.time('_emitInlinedDependencies');
+  let proj = new Project(options);
+  proj.addSourceFileAtPath(testFilename);
+  const allFiles = proj.emitToMemory().getFiles().map(f => f.filePath.replace(/\.js$/, '.ts')); //get dependency graph in dependency order
+  proj = new Project(options);
+  allFiles.forEach(path => proj.addSourceFileAtPath(path));
+  proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
+  const files = proj.emitToMemory().getFiles();
+
+  const inlinedDependencies = files
+          .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
+          .map((f, index) => ({ path: f.filePath, src: `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`, index }))
+          .reduce((obj, x) => (obj[x.path] = x, obj), <{[path: string]: {path: string, src: string, index: number}}>{});
+
+  console.timeEnd('_emitInlinedDependencies');
+  
+  expect(allFiles).toEqual([
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+  ]);
+
+  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
+});
+
+
+test('typescript transpile performance profiling2', async () => {
+  const options = { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } };
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+
+  console.time('_emitInlinedDependencies');
+  let proj = new Project(options);
+
+  proj.addSourceFileAtPath(testFilename);
+  proj.resolveSourceFileDependencies();
+  
+  proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
+  const r = proj.emitToMemory();
+  const files = r.getFiles();
+  const allFiles = files.map(x => x.filePath).reverse();
+  
+  const inlinedDependencies = files
+          .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
+          .reverse()
+          .map((f, index) => ({ path: f.filePath, src: `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`, index }))
+          .reduce((obj, x) => (obj[x.path] = x, obj), <{[path: string]: {path: string, src: string, index: number}}>{});
+
+  console.timeEnd('_emitInlinedDependencies');
+  
+  expect(allFiles).toEqual([
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+  ]);
+
+  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
+});
+
+test('typescript compile performance', async () => {
+  const options = { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } };
+  
+  
+/* 2.4s
+   let proj = new Project(options);
+  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove());
+  const transpiled = proj.emitToMemory().getFiles()[0];
+ */
+
+  //const src = await fs.readFile('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts', 'utf-8'); //3ms
+  //const result = typescript.transpileModule(src.replace(/^import.*/gm,''), options); //65ms
+
+  console.time('extract imports');
+  let proj = new Project(options);
+  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  const imports = f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+  console.timeEnd('extract imports');
+
+
+  expect(1).toEqual(2);
+});
 
 test('hotModuleReload reloadTestFile', async () => {
-  const testDecl = `test('simple test', async ({ page }) => {`;
-  const executingLine = `    await PlaywrightLiveRecorder.start(page, s => eval(s));`;
-  
-  await hotModuleReload.init('./tests/example-test-project/example.spec.before.ts', testDecl, executingLine);
-  
-  let imports: string, inlinedDeps: string, codeBlock: string;
-  await hotModuleReload.reloadTestFile('./tests/example-test-project/example.spec.after.ts', testDecl, executingLine, (i, deps, src) => { imports = i; inlinedDeps = deps; codeBlock = src;});
+  const testCallingLocation: TestCallingLocation = {
+    file: `./tests/example-test-project/example.spec.before.ts`,
+    testLine: `test('simple test', async ({ page }) => {`,
+    executingLine: `    await PlaywrightLiveRecorder.start(page, s => eval(s));`,
+  };
+  let evalText: string;
+  await hotModuleReload.init(testCallingLocation, (str: string) => console.log(`pageEvaluate: ${str}`), (s: string) => evalText = s);
+  const s = hotModuleReload._state;
+  await hotModuleReload._initialTestFileLoad(s);
 
+  s.t.file = `./tests/example-test-project/example.spec.after.ts`;
+  await hotModuleReload._reloadTestFile(s);
 
-  expect(imports!).toEqual(
+  expect(evalText!).toEqual(
 `var { test, expect } = require('@playwright/test');
-var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');`);
+var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
 
-
-  expect(inlinedDeps!).toEqual(
-`//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/utility.js transpiled
+//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.js transpiled
 function createGuid() {
     return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
 }
@@ -37,12 +151,9 @@ class intro_page {
         return page.locator(this.home_selector);
     }
 }
-`);
 
 
-  expect(codeBlock!).toContain(`    await expect(page).toHaveTitle('Google');`);
-  expect(codeBlock!).toEqual(
-`(async function() {
+(async function() {
   try {
     await expect(page).toHaveTitle('Google');
     Object.assign(globalThis, { });
@@ -127,3 +238,72 @@ test('extract import statements', async() => {
   const imports = hotModuleReload._extractImports(testFilename);
   console.log({imports});
 });
+
+
+
+
+/* 
+single watcher, can have set of files being watched be mutated
+
+
+initial load
+  full dependency graph from test_file.ts
+    add files to watcher list
+    {[path: string]: {imports: ImportDeclaration[], transpiled: string}}
+
+  Discovery pass - ts-morph.emitToMemory (slow ~4s)
+   
+   * [test_file.ts]
+ / | \
+*  *  * [intro_page.ts, home_page.ts]
+   |
+   *    [gridUtil.ts requires lodash]
+
+transpile pass
+  re evaluate imports (ts-morph 20ms)
+    if imports list changed, perform discovery pass (on this file)
+      if any new files, add to watcher list, and transpile them
+
+  strip imports (replace with commented out line? string manipulation)
+  typescript.transpileModule (fast 80ms/file)
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,10 +1,14 @@
 import { Page, test } from "@playwright/test";
-import { pageObjectModel } from "./pageObjectModel";
-import { recorder } from "./recorder";
+
 import * as chokidar from "chokidar";
-import { repl } from "./repl";
-import { PlaywrightLiveRecorderConfig } from "./types";
 import * as _ from "lodash";
+
+import { PlaywrightLiveRecorderConfig, TestCallingLocation } from "./types";
+import { recorder } from "./recorder";
+import { testFileWriter } from "./testFileWriter";
+import { hotModuleReload } from "./hotModuleReload";
+import { pageObjectModel } from "./pageObjectModel";
+import { getTestCallingLocation } from "./utility";
 
 export type { PlaywrightLiveRecorderConfig };
 export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
@@ -69,7 +73,10 @@ export class ${className} {
         }
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
-        await repl.init(page, evalScope);
+        const testCallingLocation = await getTestCallingLocation();
+        await testFileWriter.init(page, testCallingLocation);
+        await hotModuleReload.init(testCallingLocation, (str: string) => page.evaluate(str), evalScope);
+        
         await recorder.init(config.recorder, page);
 
         await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser

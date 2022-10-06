@@ -67,5 +67,7 @@ type PlaywrightLiveRecorderConfig_diagnostic = {
     hotReloadBrowserLibFiles: boolean,
 }
 
+type TestCallingLocation = { file: string, testLine: string, executingLine: string };
+
 //type AddScriptTag_Args = Parameters<Page['addScriptTag']>[0];
 //type AddScriptTag_Return = ReturnType<Page['addScriptTag']>;

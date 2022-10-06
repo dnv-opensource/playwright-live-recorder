@@ -1,61 +1,170 @@
 import { ts, Project, ImportDeclaration } from "ts-morph";
+import * as typescript from "typescript";
 import * as nodePath from "node:path";
+import * as chokidar from "chokidar";
+import * as AsyncLock from "async-lock";
+import * as fs from "node:fs/promises";
+import * as _ from "lodash";
 
-type InlinedDependency = {path: string, src: string, index: number};
+import { TestCallingLocation } from "./types";
+
+type hotModuleReloadState = {
+    t: TestCallingLocation;
+    testFnContents: string;
+    dependenciesWatcher: chokidar.FSWatcher;
+    dependencies: InlinedDependencies;
+    imports: ImportDeclaration[];
+    pageEvaluate: (pageFunction: string) => Promise<unknown>;
+    evalScope: (s: string) => any;
+}
+
+type InlinedDependency = { path: string, imports: ImportDeclaration[], transpiledSrc: string, index: number };
+type InlinedDependencies = { [path: string]: InlinedDependency };
+
 export module hotModuleReload {
-    let testFilename: string;
-    let testFnContents: string;
-    let inlinedDependencies: Set<InlinedDependency>;
-    let imports: ImportDeclaration[];
-    
-    export async function init(filename: string, testFnDecl: string, executingLine: string) {
-        testFilename = filename;
-        testFnContents = (await _extractFnContents(filename, testFnDecl, executingLine))!;
-        inlinedDependencies = _emitInlinedDependencies(filename);
-        imports = _extractImports(filename);
+    export const _state: hotModuleReloadState = <any>{};
+    const lock = new AsyncLock();
+
+    export async function init(testCallingLocation: TestCallingLocation, pageEvaluate: (pageFunction: string) => (Promise<unknown> | any), evalScope: (s: string) => any) {
+        _state.t = testCallingLocation;
+        _state.pageEvaluate = pageEvaluate;
+        _state.evalScope = evalScope;
+        _state.dependenciesWatcher = chokidar.watch([]);
+        _state.dependenciesWatcher.on('change', async path => await _transpilePass(path, _state));
+        _state.dependencies = {};
+
+        await _initialTestFileLoad(_state);
+
+        const testFileWatcher = chokidar.watch(nodePath.resolve(_state.t.file));
+        testFileWatcher.on('change', async () => await hotModuleReload._reloadTestFile(_state));
     }
 
-    /** test file is a special case - we're not loading a module into the executing environment, instead we:
-     * ensure all imports are included
-     * given a test method starting line,
-     * compare the new content with the old content to determine what needs to be executed
-     */
-    export async function reloadTestFile(filename: string, testFnDecl: string, executingLine: string, repl: (imports: string, inlinedDependencies: string, codeBlock: string) => Promise<void> | any) {
-        const newTestFnContents = await (_extractFnContents(filename, testFnDecl, executingLine)) ?? '';
-
-        const blockToExecute = _getBlockToExecute(testFnContents, newTestFnContents);
-        //get script preamble: all test file imports, and inlined dependencies before the blockToExecute
-        console.log({blockToExecute});
-        imports = _extractImports(filename); //refresh imports
-        inlinedDependencies = _emitInlinedDependencies(filename); //refresh inlined dependencies - warning: slow, todo: incrementally update these based on file watcher
-
-        const depsRelativePaths = [...inlinedDependencies].map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(testFilename), x.path)).replace(/\.js$/m, ''));
-        await repl(
-            _importToRequireSyntax(imports.filter(i => !depsRelativePaths.includes(_getImportPath(i)))), 
-            [...inlinedDependencies].map(x => x.src).join('\n\n'), 
-            _wrapAsyncAsPromise(blockToExecute, _extractVariableListFrom(blockToExecute)));
-
-        testFnContents = newTestFnContents;
+    export async function _initialTestFileLoad(s: hotModuleReloadState) {
+        s.testFnContents = (await _extractFnContents(s.t.file, s.t.testLine, s.t.executingLine))!;
+        s.imports = _extractImports(s.t.file);
+        const depFiles = await _discoveryPass(s.t.file);
+        s.dependenciesWatcher.add(depFiles);
+        await _updateInlinedDependencies(depFiles, s.dependencies);
     }
 
+    export async function _reloadTestFile(s: hotModuleReloadState) {
+        await lock.acquire('reloadTestFile', async (release) => {
+            const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.executingLine)) ?? '';
+            const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
+            if (blockToExecute === '') return;
+            console.debug({ blockToExecute });
+            await evalLines(blockToExecute, s);
+            s.testFnContents = newTestFnContents;
+            release();
+        });
+    }
+
+    async function evalLines(lines: string, s: hotModuleReloadState) {
+        s.imports = _extractImports(s.t.file); //refresh imports
+        const { importsBlock, inlinedDependenciesBlock } = _buildEvalContext(s);
+        const wrappedEvalLines = _wrapAsyncAsPromise(lines, _extractVariableListFrom(lines));
+
+        await _evalCore(s.evalScope, s.pageEvaluate, [importsBlock + '\n\n', inlinedDependenciesBlock + '\n\n', wrappedEvalLines]);
+    }
+
+    export async function _updateInlinedDependencies(filenames: string[], deps: InlinedDependencies) {
+        await Promise.all(filenames.map(async (f, index) => {
+            if (deps[f] === undefined) deps[f] = await _buildInlinedDependency(f, index);
+            else if (_importsChanged(deps[f])) deps[f] = await _buildInlinedDependency(f, index);
+            else deps[f].index = index;
+        }));
+        const depsToRemove = _.difference(Object.keys(deps), filenames);
+        depsToRemove.forEach(x => delete (deps[x]));
+    }
+
+    export function _importsChanged(dep: InlinedDependency) {
+        let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
+        const ast = proj.addSourceFileAtPath(dep.path);
+        const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+        if (dep.imports.length !== imports.length)
+            return true;
+
+        const importsText = imports.map(x => x.compilerNode.getText());
+        const cachedImportsText = dep.imports.map(x => x.compilerNode.getText());
+        if (!importsText.every(x => cachedImportsText.includes(x)))
+            return true;
+
+        return false;
+    }
+
+    export async function _buildInlinedDependency(filename: string, index: number) {
+        let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
+        const ast = proj.addSourceFileAtPath(filename);
+        const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+        let src = await fs.readFile(filename, 'utf-8');
+        //strip the imports, add comment block around each one
+        imports.forEach((x, index) => src = src.slice(0, x.compilerNode.pos + index * 4) + '/*' + src.slice(x.compilerNode.pos + index * 4, x.compilerNode.end + index * 4) + '*/' + src.slice(x.compilerNode.end + index * 4));
+
+        const result = typescript.transpileModule(src, { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } });
+        let transpiledSrc = result.outputText;
+        return <InlinedDependency>{ path: filename, imports, transpiledSrc: transpiledSrc, index };
+    }
+
+    function _buildEvalContext(s: hotModuleReloadState) {
+        const excludedImports = Object.values(s.dependencies).map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(s.t.file), x.path)).replace(/\.js$/m, ''));
+        const importsBlock = _importToRequireSyntax(s.imports.filter(i => !excludedImports.includes(_getImportPath(i))));
+        const inlinedDependenciesBlock = Object.values(s.dependencies).map(x => x.transpiledSrc).join('\n\n');
+        return { importsBlock, inlinedDependenciesBlock };
+    }
+    function _importToRequireSyntax(imports: ImportDeclaration[]) {
+        return imports.map(x => x.print().replace(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/, 'var $1 = require($2);')).join('\n');
+    }
     function _getImportPath(i: ImportDeclaration) {
-        const importPath = i.getChildren()[3].print().replace(/['"`]/gm, '');
-        const normalizedImportPath = nodePath.normalize(importPath);
-        return normalizedImportPath;
+        return nodePath.normalize(i.getChildren()[3].print().replace(/['"`]/gm, ''));
     }
 
-    export function _getBlockToExecute(oldSrc: string, newSrc: string) {
-        const oldLines = oldSrc.split(_NEWLINE);
-        const newLines = newSrc.split(_NEWLINE);
+    export function _wrapAsyncAsPromise(codeBlock: string, variables: string[]) {
+        return `(async function() {
+  try {
+${codeBlock}
+${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(', ')}});`}
+  } catch (err) {
+    console.error(err);
+  }
+})()`;
+    }
 
-        if (oldLines.length == 0) return newSrc;
-        const firstLineWithChange = newLines.find((s, index) => oldLines.length < index || oldLines[index] !== s);
-        if (firstLineWithChange == null) return '';
+    export function _extractVariableListFrom(blockToExecute: string) {
+        const proj = new Project();
+        const srcFile = proj.createSourceFile('./blockToExecute.ts', blockToExecute);
+        const variableNames = srcFile.getChildrenOfKind(ts.SyntaxKind.VariableStatement).map(x => {
+            const syntaxList = x.getChildren()[0].getChildren()[1];
+            const assignmentStatement = blockToExecute.slice(syntaxList.compilerNode.pos, syntaxList.compilerNode.end);
+            const varBlock = /\s*\{?(.+)\}?\s*=/.exec(assignmentStatement)![1];
+            const listOfVars = varBlock.trim().replace(/}$/m, '').split(',').map(x => x.trim());
+            return listOfVars;
+        });
+        return variableNames.flat();
+    }
 
-        const linesToExecute = newLines.slice(newLines.indexOf(firstLineWithChange));
+    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
+        try {
+            await pageEvaluate(`window.PW_executing = true`);
+            await evalScope(codeBlocks.join(''));
+            await pageEvaluate(`PW_reportError()`);
+        } catch (error) {
+            if (error instanceof Error) {
+                await pageEvaluate(`PW_reportError(\`${error.message}\`, \`${error.stack}\`)`);
+                console.warn(error);
+            } else {
+                await pageEvaluate(`PW_reportError(\`Unexpected error during eval - See DEBUG CONSOLE in test execution environment for details\`, \`${JSON.stringify(error)}\`)`);
+                console.error(error);
+            }
+        } finally {
+            await pageEvaluate(`window.PW_executing = false`);
+        }
+    }
 
-        const blockToExecute = linesToExecute.join('\n');
-        return blockToExecute;
+    export function _extractImports(filename: string) {
+        const project = new Project();
+        const ast = project.addSourceFileAtPath(filename);
+        const allImports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+        return allImports;
     }
 
     export async function _extractFnContents(filename: string, fnDecl: string, executingLine: string) {
@@ -75,64 +184,40 @@ export module hotModuleReload {
         return functionContentsUpToExecutingLine;
     }
 
-    export function _extractImports(filename: string) {
-        const project = new Project();
-        const ast = project.addSourceFileAtPath(filename);
+    export function _getBlockToExecute(oldSrc: string, newSrc: string) {
+        if (oldSrc === undefined) return '';
 
-        //find the test function block within the test file
-        const allImports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
-        return allImports;
+        const oldLines = oldSrc.split(_NEWLINE);
+        const newLines = newSrc.split(_NEWLINE);
+
+        if (oldLines.length == 0) return newSrc;
+        const firstLineWithChange = newLines.find((s, index) => oldLines.length < index || oldLines[index] !== s);
+        if (firstLineWithChange == null) return '';
+
+        const linesToExecute = newLines.slice(newLines.indexOf(firstLineWithChange));
+
+        const blockToExecute = linesToExecute.join('\n');
+        return blockToExecute;
     }
 
-    export function _emitInlinedDependencies(filename: string) {
-        const testFilename = nodePath.resolve(filename);
-  
-        let proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
-
-        proj.addSourceFileAtPath(testFilename);
-        
-        const r = proj.emitToMemory();
-        const files = r.getFiles();
+    export async function _discoveryPass(filename: string) {
+        filename = nodePath.resolve(filename);
+        let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
+        proj.addSourceFileAtPath(filename);
         const allFiles = proj.emitToMemory().getFiles().map(f => f.filePath.replace(/\.js$/, '.ts')); //get dependency graph in dependency order
-        
-        proj = new Project({compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false }});
-        allFiles.forEach(path => proj.addSourceFileAtPath(path));
-        proj.getSourceFiles().map(f => f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove())); //snip all interdependencies
-
-        const inlinedDependencies = new Set(
-        files
-            .filter(f => nodePath.resolve(f.filePath).replace(/\.js$/, '.ts') !== testFilename) //exclude the test file from the ambient code
-            .map((f, index) => ({path: f.filePath, src: `//${f.filePath} transpiled\n${f.text.replace(/^export\s?/gm, '')}`, index})));
-
-        return inlinedDependencies;
+        return allFiles.map(f => nodePath.resolve(f));
     }
 
-    export function _wrapAsyncAsPromise(codeBlock: string, variables: string[]) {
-        return `(async function() {
-  try {
-${codeBlock}
-    Object.assign(globalThis, { ${variables.join(', ')}});
-  } catch (err) {
-    console.error(err);
-  }
-})()`;
-    }
-
-    export function _extractVariableListFrom(blockToExecute: string) {
-        const proj = new Project();
-        const srcFile = proj.createSourceFile('./blockToExecute.ts', blockToExecute);
-        const variableNames = srcFile.getChildrenOfKind(ts.SyntaxKind.VariableStatement).map(x => {
-            const syntaxList = x.getChildren()[0].getChildren()[1];
-            const assignmentStatement = blockToExecute.slice(syntaxList.compilerNode.pos, syntaxList.compilerNode.end);
-            const varBlock = /\s*\{?(.+)\}?\s*=/.exec(assignmentStatement)![1];
-            const listOfVars =  varBlock.trim().replace(/}$/m, '').split(',').map(x => x.trim());
-            return listOfVars;
-        });
-        return variableNames.flat();
-    }
-
-    export function _importToRequireSyntax(imports: ImportDeclaration[]) {
-        return imports.map(x => x.print().replace(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/, 'var $1 = require($2);')).join('\n');
+    export async function _transpilePass(filename: string, s: hotModuleReloadState) {
+        filename = nodePath.resolve(filename);
+        const cached = s.dependencies[filename];
+        if (_importsChanged(cached)) {
+            const depFiles = await _discoveryPass(s.t.file);
+            s.dependenciesWatcher.add(depFiles);
+            await _updateInlinedDependencies(depFiles, s.dependencies);
+            return;
+        }
+        s.dependencies[filename] = await _buildInlinedDependency(cached.path, cached.index);
     }
 
     const _NEWLINE = /\r\n|\n|\r/;

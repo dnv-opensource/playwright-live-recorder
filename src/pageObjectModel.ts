@@ -35,7 +35,7 @@ export module pageObjectModel {
 
         const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
         
-        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process ensures everything is loaded
+        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process gets hit for each file on startup, which ensures everything is loaded
         watch.on('add', path => reload(path, config.path, page));
         watch.on('change', path => reload(path, config.path, page));
     }
