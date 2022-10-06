@@ -149,7 +149,12 @@ async function recordModeClickHandler(event) {
     const resultOutput = result.output(result.match(element));
     PW_repl.value = resultOutput;
     PW_repl.disabled = false;
-    await PW_appendToTest(resultOutput);
+    
+    if (result.isPageObjectModel) {
+        await PW_appendToTest(resultOutput, element.getAttribute('data-pom-import-statement'));
+    } else {
+        await PW_appendToTest(resultOutput);
+    }
 }
 
 document.PW_getRuleForElement = function (el) {
@@ -196,6 +201,7 @@ async function reload_page_object_model_elements() {
             const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
     
             el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
+            el.setAttribute('data-pom-import-statement', `import {${pageObject.className}} from './${pageObjectFilePath.replace(/\.ts$/gm, '')}';`);
             config.pageObjectModel.overlay.on(el, config);
             PW_overlays.push(el);
         }
