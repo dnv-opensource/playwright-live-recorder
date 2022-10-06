@@ -49,13 +49,18 @@ export module hotModuleReload {
 
     export async function _reloadTestFile(s: hotModuleReloadState) {
         await lock.acquire('reloadTestFile', async (release) => {
-            const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.executingLine)) ?? '';
-            const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
-            if (blockToExecute === '') return;
-            console.debug({ blockToExecute });
-            await evalLines(blockToExecute, s);
-            s.testFnContents = newTestFnContents;
-            release();
+            try {
+                const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.executingLine)) ?? '';
+                const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
+                if (blockToExecute === '')
+                    return;
+
+                console.debug({ blockToExecute });
+                await evalLines(blockToExecute, s);
+                s.testFnContents = newTestFnContents;
+            } finally {
+                release();
+            }
         });
     }
 
@@ -93,12 +98,29 @@ export module hotModuleReload {
     }
 
     export async function _buildInlinedDependency(filename: string, index: number) {
+        let src = await fs.readFile(filename, 'utf-8');
+
         let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
         const ast = proj.addSourceFileAtPath(filename);
-        const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
-        let src = await fs.readFile(filename, 'utf-8');
+
+
         //strip the imports, add comment block around each one
-        imports.forEach((x, index) => src = src.slice(0, x.compilerNode.pos + index * 4) + '/*' + src.slice(x.compilerNode.pos + index * 4, x.compilerNode.end + index * 4) + '*/' + src.slice(x.compilerNode.end + index * 4));
+        const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+        const exportKeywords = ast.getDescendantsOfKind(ts.SyntaxKind.ExportKeyword);
+
+        let offset = 0;
+        for (const x of imports) {
+            const start = x.getStart();
+            const end = x.getEnd();
+            src = src.slice(0, start + offset) + '/*' + src.slice(start + offset, end + offset) + '*/' + src.slice(end + offset);
+            offset += ('/*' + '*/').length;
+        }
+        for (const x of exportKeywords) {
+            const start = x.getStart();
+            const end = x.getEnd();
+            src = src.slice(0, start + offset) + '/*' + src.slice(start + offset, end + offset) + '*/' + src.slice(end + offset);
+            offset += ('/*' + '*/').length;
+        }
 
         const result = typescript.transpileModule(src, { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } });
         let transpiledSrc = result.outputText;
@@ -106,7 +128,7 @@ export module hotModuleReload {
     }
 
     function _buildEvalContext(s: hotModuleReloadState) {
-        const excludedImports = Object.values(s.dependencies).map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(s.t.file), x.path)).replace(/\.js$/m, ''));
+        const excludedImports = Object.values(s.dependencies).map(x => nodePath.normalize(nodePath.relative(nodePath.dirname(s.t.file), x.path)).replace(/\.ts$/m, ''));
         const importsBlock = _importToRequireSyntax(s.imports.filter(i => !excludedImports.includes(_getImportPath(i))));
         const inlinedDependenciesBlock = Object.values(s.dependencies).map(x => x.transpiledSrc).join('\n\n');
         return { importsBlock, inlinedDependenciesBlock };
@@ -205,7 +227,9 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
         proj.addSourceFileAtPath(filename);
         const allFiles = proj.emitToMemory().getFiles().map(f => f.filePath.replace(/\.js$/, '.ts')); //get dependency graph in dependency order
-        return allFiles.map(f => nodePath.resolve(f));
+        return allFiles
+            .map(f => nodePath.resolve(f))
+            .filter(f => f !== filename); //exclude the top level test file itself in dependencies
     }
 
     export async function _transpilePass(filename: string, s: hotModuleReloadState) {
