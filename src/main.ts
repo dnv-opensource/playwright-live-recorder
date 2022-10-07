@@ -1,10 +1,14 @@
 import { Page, test } from "@playwright/test";
-import { pageObjectModel } from "./pageObjectModel";
-import { recorder } from "./recorder";
-import * as fs from "fs/promises";
-import { repl } from "./repl";
-import { PlaywrightLiveRecorderConfig } from "./types";
+
+import * as chokidar from "chokidar";
 import * as _ from "lodash";
+
+import { PlaywrightLiveRecorderConfig, TestCallingLocation } from "./types";
+import { recorder } from "./recorder";
+import { testFileWriter } from "./testFileWriter";
+import { hotModuleReload } from "./hotModuleReload";
+import { pageObjectModel } from "./pageObjectModel";
+import { getTestCallingLocation } from "./utility";
 
 export type { PlaywrightLiveRecorderConfig };
 export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
@@ -69,7 +73,10 @@ export class ${className} {
         }
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
-        await repl.init(page, evalScope);
+        const testCallingLocation = await getTestCallingLocation();
+        await testFileWriter.init(page, testCallingLocation);
+        await hotModuleReload.init(testCallingLocation, (str: string) => page.evaluate(str), evalScope);
+        
         await recorder.init(config.recorder, page);
 
         await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
@@ -91,10 +98,8 @@ export class ${className} {
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
 
         if (config.diagnostic.hotReloadBrowserLibFiles) {
-            // tslint:disable: no-floating-promises
-            (async () => { for await (const event of fs.watch(config.diagnostic.browserCodeJSPath)) event.eventType === 'change' ? await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath }) : {}; })();   //fire-and-forget the watcher
-            (async () => { for await (const event of fs.watch(config.diagnostic.browserCodeCSSPath)) event.eventType === 'change' ? await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath }) : {}; })();  //fire-and-forget the watcher
-            // tslint:enable: no-floating-promises
+            const watch = chokidar.watch([config.diagnostic.browserCodeJSPath, config.diagnostic.browserCodeCSSPath]);
+            watch.on('change', async path => await page.addScriptTag({ path }));
         }
 
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });

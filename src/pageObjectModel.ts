@@ -6,13 +6,8 @@ import * as chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 import * as AsyncLock from "async-lock";
+import { ModuleKind, Project } from "ts-morph";
 
-let state: {
-    config: PlaywrightLiveRecorderConfig_pageObjectModel,
-    page: Page,
-} = <any>{};
-const TrackedPaths: Set<string> = new Set<string>();
-const TrackedPoms: { [name: string]: PomEntry } = {};
 
 export interface PomEntry {
     name: string;
@@ -23,9 +18,16 @@ export interface PomEntry {
 
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
+    export let _state: {
+        config: PlaywrightLiveRecorderConfig_pageObjectModel,
+        page: Page,
+    } = <any>{};
+    const TrackedPaths: Set<string> = new Set<string>();
+    const TrackedPoms: { [name: string]: PomEntry } = {};
+    
     const lock = new AsyncLock();
     export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
-        state = {config, page};
+        _state = {config, page};
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
@@ -33,7 +35,7 @@ export module pageObjectModel {
 
         const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
         
-        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process ensures everything is loaded
+        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process gets hit for each file on startup, which ensures everything is loaded
         watch.on('add', path => reload(path, config.path, page));
         watch.on('change', path => reload(path, config.path, page));
     }
@@ -73,8 +75,21 @@ export module pageObjectModel {
         return pom;
     }
 
+    export async function _transpile2(normalizedFilePath: string, className: string): Promise<{ [name: string]: PomEntry }> {
+        const tsProject = new Project({compilerOptions: { strict: false, module: ModuleKind.ESNext}});
+        tsProject.addSourceFileAtPath(nodePath.join(_state.config.path, normalizedFilePath));
+        const emitResult = tsProject.emitToMemory();
+        //emit result contains entire graph of local files to load
+        const fileEntries = emitResult.getFiles().map(x => ({ path: nodePath.relative(_state.config.path, x.filePath), content: x.text }));
+        const newPoms: { [name: string]: PomEntry } = {};
+        for (const entry of fileEntries) {
+            newPoms[entry.path] = { name: entry.path, content: entry.content, deps: [], isLoaded: true };
+        }
+        return newPoms;
+    }
+
     export function _transpile(normalizedFilePath: string, className: string, fileContents: string): PomEntry {
-        const transpiled = ts.transpile(fileContents, { module: ts.ModuleKind.ESNext, strict: false });
+        const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } } ).outputText;
         const deps = _getDeps(transpiled);
         const content = _cleanUpTranspiledSource(normalizedFilePath, className, transpiled);
         return { name: className, deps, content, isLoaded: false };
@@ -91,7 +106,7 @@ export module pageObjectModel {
         const exportReplacementText = `window.PW_pages['${normalizedFilePath}'] = {className: '${className}', page: ${className} };`;
         const content = transpiled
             //.replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, 'const $1 = require($2);') //convert 'import' to 'require' statements
-            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '') //remove all (local) import statements //todo: extract and track local imports to create a dependency order/hierarchy
+            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
             .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`) //export class fixup
             .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)                                //export class fixup
             .replace(`export var ${className};`, exportReplacementText) //export module fixup

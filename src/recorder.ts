@@ -1,5 +1,6 @@
 import { Page } from "@playwright/test";
 import * as fs from "fs/promises";
+import * as chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_recorder } from "./types";
 
 //exposes recorderRules pieces (load, watch and reload, prependRecordingRule method)
@@ -8,8 +9,8 @@ export module recorder {
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(config.path, matcherCode));
         await page.addScriptTag({ path: config.path });
 
-        // tslint:disable-next-line: no-floating-promises
-        (async () => { for await (const event of fs.watch(config.path)) event.eventType === 'change' ? await page.addScriptTag({ path: config.path }) : {}; })(); //fire-and-forget the watcher
+        const watch = chokidar.watch(config.path);
+        watch.on('change', async path => await page.addScriptTag({ path }));
     }
 
     async function prependRecordingRule(config_recorder_path: string, matcherCode: string) {
