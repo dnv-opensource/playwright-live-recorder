@@ -26,6 +26,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     urlToFilePath: (url: string) => string,
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector/*/
     propertySelectorRegex: RegExp,
+    /** @remarks Use this to identify methods that return elements @default /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/*/
+    isElementPropertyRegex: RegExp,
     /** @default (className) => 
     `import { Page } from "@playwright/test";
 

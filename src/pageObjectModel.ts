@@ -19,6 +19,7 @@ export interface PomEntry {
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
     export let _state: {
+        testFileDir: string,
         config: PlaywrightLiveRecorderConfig_pageObjectModel,
         page: Page,
     } = <any>{};
@@ -26,9 +27,10 @@ export module pageObjectModel {
     const TrackedPoms: { [name: string]: PomEntry } = {};
     
     const lock = new AsyncLock();
-    export async function init(config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
-        _state = {config, page};
+    export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
+        _state = {testFileDir, config, page};
         await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
+        await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(_state.config.path, pathFromRoot), _state.testFileDir));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
         await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock, config));
@@ -38,6 +40,12 @@ export module pageObjectModel {
         //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process gets hit for each file on startup, which ensures everything is loaded
         watch.on('add', path => reload(path, config.path, page));
         watch.on('change', path => reload(path, config.path, page));
+    }
+
+    export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
+        const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
+        const importPath = nodePath.join(x.dir, x.name).replace('\\', '/'); // relative path without extension
+        return `import { ${className} } from '${importPath}';`
     }
 
     export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {

@@ -2,8 +2,9 @@ import { Page, test } from "@playwright/test";
 
 import * as chokidar from "chokidar";
 import * as _ from "lodash";
+import * as nodePath from "node:path";
 
-import { PlaywrightLiveRecorderConfig, TestCallingLocation } from "./types";
+import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
 import { testFileWriter } from "./testFileWriter";
 import { hotModuleReload } from "./hotModuleReload";
@@ -17,8 +18,9 @@ export module PlaywrightLiveRecorder {
     /** {@inheritDoc PlaywrightLiveRecorderConfig} */
     export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
         recorder: {
-            /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js' */
-            path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js',
+            /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
+            path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js',
+
         },
         pageObjectModel: {
             enabled: true,
@@ -34,6 +36,7 @@ export module PlaywrightLiveRecorder {
                 .replace(/\/$/, '') // clear trailing /
                 + '_page.ts',
             propertySelectorRegex: /(.+)_selector/,
+            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/,
             generateClassTemplate: (className) => 
 `import { Page } from "@playwright/test";
 
@@ -85,14 +88,14 @@ export class ${className} {
 
         if (config.pageObjectModel.enabled) {
             config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
-            await pageObjectModel.init(config.pageObjectModel, page);
+            await pageObjectModel.init(nodePath.dirname(testCallingLocation.file), config.pageObjectModel, page);
         }
 
-        page.on('framenavigated', async frame => {
-            await frame.addScriptTag({ path: config.recorder.path });
-            await frame.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
-            await frame.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
-            await pageObjectModel.reloadAll(config.pageObjectModel.path, frame.page());
+        page.on('load', async page => {
+            await page.addScriptTag({ path: config.recorder.path });
+            await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
+            await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
+            await pageObjectModel.reloadAll(config.pageObjectModel.path, page);
         });
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
