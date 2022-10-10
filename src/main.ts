@@ -3,7 +3,7 @@ import { Page, test } from "@playwright/test";
 import * as chokidar from "chokidar";
 import * as _ from "lodash";
 
-import { PlaywrightLiveRecorderConfig, TestCallingLocation } from "./types";
+import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
 import { testFileWriter } from "./testFileWriter";
 import { hotModuleReload } from "./hotModuleReload";
@@ -17,8 +17,9 @@ export module PlaywrightLiveRecorder {
     /** {@inheritDoc PlaywrightLiveRecorderConfig} */
     export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
         recorder: {
-            /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js' */
-            path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live_recorderRules.js',
+            /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
+            path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js',
+
         },
         pageObjectModel: {
             enabled: true,
