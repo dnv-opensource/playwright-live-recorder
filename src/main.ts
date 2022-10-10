@@ -2,6 +2,7 @@ import { Page, test } from "@playwright/test";
 
 import * as chokidar from "chokidar";
 import * as _ from "lodash";
+import * as nodePath from "node:path";
 
 import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
@@ -35,6 +36,7 @@ export module PlaywrightLiveRecorder {
                 .replace(/\/$/, '') // clear trailing /
                 + '_page.ts',
             propertySelectorRegex: /(.+)_selector/,
+            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/,
             generateClassTemplate: (className) => 
 `import { Page } from "@playwright/test";
 
@@ -86,7 +88,7 @@ export class ${className} {
 
         if (config.pageObjectModel.enabled) {
             config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
-            await pageObjectModel.init(config.pageObjectModel, page);
+            await pageObjectModel.init(nodePath.dirname(testCallingLocation.file), config.pageObjectModel, page);
         }
 
         page.on('load', async page => {

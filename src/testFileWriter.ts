@@ -16,6 +16,7 @@ export module testFileWriter {
             let proj = new Project({ compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipDefaultLibCheck: true } });
             const ast = proj.addSourceFileAtPath(t.file);
             const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
+            //todo: parse importStatement, only add the line if no pre-existing import from the source file
             const lastImportLine = Math.max(...imports.map(i => i.getEndLineNumber()));
             testFileSrcLines.splice(lastImportLine + 1, 0, importStatement);
         }

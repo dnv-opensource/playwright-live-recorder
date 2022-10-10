@@ -1,5 +1,5 @@
 /**
- * PW_live_recorderRules contract:
+ * PW_selectorConventions contract:
  * array of { match(el) => resultType | undefined, output(x: resultType) => code: string, <optional>isPageObjectModel: boolean}
  * notes:
  *   match(el) => null/undefined inidicates not a match
@@ -18,7 +18,7 @@ var PW_selectorConventions = [
 
 // built in conventions, should not need to be overridden //
 /*
-var PW_selector_PageObjectModel_conventions = [
+var PW_selector_pageObjectModel_conventions = [
   {
     match: (el) => el.getAttribute("data-page-object-model") ?? undefined,
     output: (command) => `await ${command};`,

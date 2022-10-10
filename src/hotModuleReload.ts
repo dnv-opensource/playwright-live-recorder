@@ -50,6 +50,11 @@ export module hotModuleReload {
     export async function _reloadTestFile(s: hotModuleReloadState) {
         await lock.acquire('reloadTestFile', async (release) => {
             try {
+                //todo check if imports changed, if so add em
+                //s.imports = _extractImports(s.t.file);
+                //const depFiles = await _discoveryPass(s.t.file);
+                //s.dependenciesWatcher.add(depFiles);
+        
                 const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.executingLine)) ?? '';
                 const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
                 if (blockToExecute === '')

@@ -25,20 +25,14 @@ PW_statusbar.innerHTML = `
 document.body.prepend(PW_statusbar);
 
 window.PW_repl = document.getElementById("PW-repl");
-PW_repl.addEventListener("keyup", (event) =>
-  (event.code || event.key) === "Enter"
-    ? PW_updateAndRerunLastCommand(PW_repl.value)
-    : {}
-);
+PW_repl.addEventListener("keyup", (event) => ((event.code || event.key) === "Enter" ? PW_updateAndRerunLastCommand(PW_repl.value) : {}));
 
 window.PW_eval_error = document.getElementById("PW-eval-error");
 PW_eval_error.style.display = "none";
 window.PW_eval_error_summary = document.getElementById("PW-eval-error-summary");
 window.PW_eval_error_details = document.getElementById("PW-eval-error-details");
 
-window.PW_page_object_model_filename = document.getElementById(
-  "PW-page-object-model-filename"
-);
+window.PW_page_object_model_filename = document.getElementById("PW-page-object-model-filename");
 
 if (window.PW_tooltip) PW_tooltip.remove();
 var PW_tooltip = document.createElement("div");
@@ -59,14 +53,11 @@ PW_config().then((c) => {
   //functions serialize through as text, try to create them as functions once again
   config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
   config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
-  config.pageObjectModel.generatePropertyTemplate = eval(
-    config.pageObjectModel.generatePropertyTemplate
-  ); // note this is done browser side... consider if it should be evaluated in test context instead
+  config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
 });
 
 function keyChord_toggleRecordMode(event) {
-  if (!(event.ctrlKey && event.altKey && event.shiftKey && event.key === "R"))
-    return;
+  if (!(event.ctrlKey && event.altKey && event.shiftKey && event.key === "R")) return;
 
   const chkbox = document.getElementById("PW-record-checkbox");
   chkbox.checked = !chkbox.checked; //this doesn't fire the changed event handler, so call toggleRecordMode manually
@@ -95,19 +86,14 @@ function toggleRecordMode(checked) {
 function updateTooltipContents(element) {
   const convention = document.PW_getSelectorConventionForElement(element);
   const matcher = convention.match(element);
-  PW_tooltip.innerText =
-    typeof matcher === "string"
-      ? matcher
-      : JSON.stringify(matcher, undefined, "\t");
+  PW_tooltip.innerText = typeof matcher === "string" ? matcher : JSON.stringify(matcher, undefined, "\t");
 }
 
 function updateTooltipPosition(x, y) {
   let xOffset = 0;
   let yOffset = 16;
-  if (x > window.visualViewport.width * 0.75)
-    xOffset = -xOffset - PW_tooltip.getBoundingClientRect().width;
-  if (y > window.visualViewport.height * 0.75)
-    yOffset = -yOffset - PW_tooltip.getBoundingClientRect().height;
+  if (x > window.visualViewport.width * 0.75) xOffset = -xOffset - PW_tooltip.getBoundingClientRect().width;
+  if (y > window.visualViewport.height * 0.75) yOffset = -yOffset - PW_tooltip.getBoundingClientRect().height;
   PW_tooltip.style.left = x + xOffset + "px";
   PW_tooltip.style.top = y + yOffset + "px";
 }
@@ -122,8 +108,7 @@ function mousemove_updateTooltip(event) {
 
     mouse_x = event.x;
     mouse_y = event.y;
-    window.PW_tooltip.style.visibility =
-      !recordModeOn || element.closest(".PW") ? "hidden" : "visible";
+    window.PW_tooltip.style.visibility = !recordModeOn || element.closest(".PW") ? "hidden" : "visible";
     if (!recordModeOn) return;
 
     updateTooltipPosition(mouse_x, mouse_y);
@@ -155,10 +140,7 @@ async function recordModeClickHandler(event) {
     newItemName = window.prompt("Page object model item name?");
     if (newItemName != null) {
       const selector = selectorConvention.match(element);
-      await PW_appendToPageObjectModel(
-        pageObjectFilePath,
-        config.pageObjectModel.generatePropertyTemplate(newItemName, selector)
-      );
+      await PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
     }
   }
   if (newItemName != null) return;
@@ -168,20 +150,15 @@ async function recordModeClickHandler(event) {
   PW_repl.disabled = false;
 
   if (selectorConvention.isPageObjectModel) {
-    await PW_appendToTest(
-      resultOutput,
-      element.getAttribute("data-pom-import-statement")
-    );
+    await PW_appendToTest(resultOutput, element.getAttribute("data-page-object-model-import"));
   } else {
     await PW_appendToTest(resultOutput);
   }
 }
 
 document.PW_getSelectorConventionForElement = function (el) {
-  const allSelectorConventions = [...PW_selector_PageObjectModel_conventions, ...PW_selectorConventions ?? [], ...PW_selector_base_conventions];
-  return allSelectorConventions.find(
-    (i) => i.match(el) != null /* null or undefined */
-  );
+  const allSelectorConventions = [...PW_selector_pageObjectModel_conventions, ...(PW_selectorConventions ?? []), ...PW_selector_base_conventions];
+  return allSelectorConventions.find((i) => i.match(el) != null /* null or undefined */);
 };
 window.addEventListener("keydown", keyChord_toggleRecordMode);
 window.addEventListener("mousemove", mousemove_updateTooltip);
@@ -189,8 +166,7 @@ window.addEventListener("click", recordModeClickHandler, true);
 
 /******** page object model feature ********/
 
-window.navigation.onnavigatesuccess = async () =>
-  await reload_page_object_model_elements();
+window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
 
 var pageObjectFilePath = "";
 
@@ -206,9 +182,9 @@ async function reload_page_object_model_elements() {
   const pageObject = window.PW_pages[pageObjectFilePath];
   if (pageObject === undefined) return;
 
-  const propertyRegex = new RegExp(
-    config.pageObjectModel.propertySelectorRegex.slice(1, -1)
-  );
+  const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
+  const isElementPropertyRegex = new RegExp(config.pageObjectModel.isElementPropertyRegex.slice(1, -1));
+  const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
   for (var prop in pageObject.page) {
     try {
       const selectorMethodName = propertyRegex.exec(prop)?.[1];
@@ -220,29 +196,17 @@ async function reload_page_object_model_elements() {
         //todo: show a warning somehow
       }
       if (matchingElements.length === 0) {
-        console.info(
-          `could not find element for selector ${selector}. skipping.`
-        );
+        console.info(`could not find element for selector ${selector}. skipping.`);
         continue;
       }
-      for (const el of matchingElements) {
-        const selectorMethod =
-          "" + pageObject.page[selectorMethodName].toString();
-        const selectorMethodArgs = selectorMethod.slice(
-          selectorMethod.indexOf("("),
-          selectorMethod.indexOf(")") + 1
-        );
 
-        el.setAttribute(
-          "data-page-object-model",
-          `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`
-        );
-        el.setAttribute(
-          "data-pom-import-statement",
-          `import {${
-            pageObject.className
-          }} from './${pageObjectFilePath.replace(/\.ts$/gm, "")}';`
-        );
+      const selectorMethod = "" + pageObject.page[selectorMethodName].toString();
+      const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf("("), selectorMethod.indexOf(")") + 1);
+      const isElementProperty = isElementPropertyRegex.test(selectorMethodName);
+      const dataPageObjectModel = `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}${isElementProperty ? '.click()' : ''}`;
+      for (const el of matchingElements) {
+        el.setAttribute("data-page-object-model", dataPageObjectModel);
+        el.setAttribute("data-page-object-model-import", pageObjectModelImportStatement);
         config.pageObjectModel.overlay.on(el, config);
         PW_overlays.push(el);
       }
@@ -253,8 +217,7 @@ async function reload_page_object_model_elements() {
 }
 
 function clearPageObjectModelElements() {
-  if (window.PW_overlays !== undefined)
-    for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
+  if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
   window.PW_overlays = [];
 }
 
@@ -263,11 +226,10 @@ function PW_reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "none";
     return;
   }
+  if (errorStack != null) errorStack = errorStack.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   PW_eval_error.style.display = "block";
   PW_eval_error_summary.innerHTML = summary;
-  PW_eval_error_details.innerHTML = doNotWrapDetails
-    ? errorStack
-    : `<pre class="PW-pre">${errorStack}</pre>`;
+  PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
 }
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available
