@@ -89,11 +89,11 @@ export class ${className} {
             await pageObjectModel.init(config.pageObjectModel, page);
         }
 
-        page.on('framenavigated', async frame => {
-            await frame.addScriptTag({ path: config.recorder.path });
-            await frame.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
-            await frame.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
-            await pageObjectModel.reloadAll(config.pageObjectModel.path, frame.page());
+        page.on('load', async page => {
+            await page.addScriptTag({ path: config.recorder.path });
+            await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
+            await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
+            await pageObjectModel.reloadAll(config.pageObjectModel.path, page);
         });
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
