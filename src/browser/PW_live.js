@@ -184,27 +184,31 @@ async function reload_page_object_model_elements() {
 
     const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
     for (var prop in pageObject.page) {
-        const selectorMethodName = propertyRegex.exec(prop)?.[1];
-        if (!selectorMethodName) continue;
+        try {
+            const selectorMethodName = propertyRegex.exec(prop)?.[1];
+            if (!selectorMethodName) continue;
 
-        const selector = pageObject.page[prop];
-        const matchingElements = playwright.$$(selector);
-        if (matchingElements.length > 1) {
-            //todo: show a warning somehow
-        }
-        if (matchingElements.length === 0) {
-            console.info(`could not find element for selector ${selector}. skipping.`);
-            continue;
-        }
-        for (const el of matchingElements) {
-            const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
-            const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
-    
-            el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
-            el.setAttribute('data-pom-import-statement', `import {${pageObject.className}} from './${pageObjectFilePath.replace(/\.ts$/gm, '')}';`);
-            config.pageObjectModel.overlay.on(el, config);
-            PW_overlays.push(el);
-        }
+            const selector = pageObject.page[prop];
+            const matchingElements = playwright.$$(selector);
+            if (matchingElements.length > 1) {
+                //todo: show a warning somehow
+            }
+            if (matchingElements.length === 0) {
+                console.info(`could not find element for selector ${selector}. skipping.`);
+                continue;
+            }
+            for (const el of matchingElements) {
+                const selectorMethod = '' + pageObject.page[selectorMethodName].toString();
+                const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf('('), selectorMethod.indexOf(')') + 1);
+        
+                el.setAttribute('data-page-object-model', `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`);
+                el.setAttribute('data-pom-import-statement', `import {${pageObject.className}} from './${pageObjectFilePath.replace(/\.ts$/gm, '')}';`);
+                config.pageObjectModel.overlay.on(el, config);
+                PW_overlays.push(el);
+            }
+        } catch (err){
+            console.log(err);
+    }
     }
 }
 
