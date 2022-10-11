@@ -18,8 +18,7 @@ export module PlaywrightLiveRecorder {
     /** {@inheritDoc PlaywrightLiveRecorderConfig} */
     export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
         recorder: {
-            /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
-            path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js',
+            path: './PW_selectorConventions.js',
 
         },
         pageObjectModel: {

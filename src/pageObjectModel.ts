@@ -9,7 +9,7 @@ import * as AsyncLock from "async-lock";
 import { ModuleKind, Project } from "ts-morph";
 
 
-export interface PomEntry {
+export interface PageObjectEntry {
     name: string;
     deps: string[];
     content: string;
@@ -24,7 +24,7 @@ export module pageObjectModel {
         page: Page,
     } = <any>{};
     const TrackedPaths: Set<string> = new Set<string>();
-    const TrackedPoms: { [name: string]: PomEntry } = {};
+    const TrackedPageObjects: { [name: string]: PageObjectEntry } = {};
     
     const lock = new AsyncLock();
     export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
@@ -44,34 +44,34 @@ export module pageObjectModel {
 
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
         const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
-        const importPath = nodePath.join(x.dir, x.name).replace('\\', '/'); // relative path without extension
+        const importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension
         return `import { ${className} } from '${importPath}';`
     }
 
     export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {
         await lock.acquire('reload', async (release) => {
             TrackedPaths.add(path);
-            const pom = await _reload(path, config_pageObjectModel_path);
-            TrackedPoms[pom.name] = pom;
-            await _attemptLoadPom(pom, page);
+            const pageModel = await _reload(path, config_pageObjectModel_path);
+            TrackedPageObjects[pageModel.name] = pageModel;
+            await _attemptLoadPageObjectModel(pageModel, page);
             await page.evaluate('reload_page_object_model_elements()');
             release();
         });
     }
 
-    export async function _attemptLoadPom(pom: PomEntry, page: Page) {
-        if (pom.deps.some(dep => TrackedPoms[dep]?.isLoaded !== true))
+    export async function _attemptLoadPageObjectModel(entry: PageObjectEntry, page: Page) {
+        if (entry.deps.some(dep => TrackedPageObjects[dep]?.isLoaded !== true))
             return; //not all dependencies are loaded, don't load the script yet, it'll get automatically loaded when the last thing it's dependent upon is loaded
 
         try {
-            await page.addScriptTag({ content: pom.content });
-            pom.isLoaded = true; //it loaded successfully, mark it as loaded
+            await page.addScriptTag({ content: entry.content });
+            entry.isLoaded = true; //it loaded successfully, mark it as loaded
 
-            //attempt reload of any TrackedPoms dependent upon it
-            for (const otherPom of _.filter(TrackedPoms, (otherPom) => otherPom.name !== pom.name && otherPom.deps.includes(pom.name)))
-                await _attemptLoadPom(otherPom, page);
+            //attempt reload of any TrackedPageObjects dependent upon it
+            for (const otherEntry of _.filter(TrackedPageObjects, (otherEntry) => otherEntry.name !== entry.name && otherEntry.deps.includes(entry.name)))
+                await _attemptLoadPageObjectModel(otherEntry, page);
         } catch (e) {
-            console.error(`error calling page.addScriptTag for pom ${pom.name}`);
+            console.error(`error calling page.addScriptTag for page object model ${entry.name}`);
         }
     }
 
@@ -79,24 +79,24 @@ export module pageObjectModel {
         const fileContents = await fs.readFile(`${config_pageObjectModel_path}${path}`, { encoding: 'utf8' });
         const className = /\\?([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
 
-        const pom = _transpile(path.replaceAll('\\', '/'), className, fileContents);
-        return pom;
+        const pageEntry = _transpile(path.replaceAll('\\', '/'), className, fileContents);
+        return pageEntry;
     }
 
-    export async function _transpile2(normalizedFilePath: string, className: string): Promise<{ [name: string]: PomEntry }> {
+    export async function _transpile2(normalizedFilePath: string, className: string): Promise<{ [name: string]: PageObjectEntry }> {
         const tsProject = new Project({compilerOptions: { strict: false, module: ModuleKind.ESNext}});
         tsProject.addSourceFileAtPath(nodePath.join(_state.config.path, normalizedFilePath));
         const emitResult = tsProject.emitToMemory();
         //emit result contains entire graph of local files to load
         const fileEntries = emitResult.getFiles().map(x => ({ path: nodePath.relative(_state.config.path, x.filePath), content: x.text }));
-        const newPoms: { [name: string]: PomEntry } = {};
+        const newPageObjectEntries: { [name: string]: PageObjectEntry } = {};
         for (const entry of fileEntries) {
-            newPoms[entry.path] = { name: entry.path, content: entry.content, deps: [], isLoaded: true };
+            newPageObjectEntries[entry.path] = { name: entry.path, content: entry.content, deps: [], isLoaded: true };
         }
-        return newPoms;
+        return newPageObjectEntries;
     }
 
-    export function _transpile(normalizedFilePath: string, className: string, fileContents: string): PomEntry {
+    export function _transpile(normalizedFilePath: string, className: string, fileContents: string): PageObjectEntry {
         const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } } ).outputText;
         const deps = _getDeps(transpiled);
         const content = _cleanUpTranspiledSource(normalizedFilePath, className, transpiled);
@@ -148,12 +148,12 @@ export module pageObjectModel {
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
     function fullRelativePath(path: string, config: { path: string }) { return nodePath.join(config.path, path); }
 
-    export function hotReloadedPomsSourceCode() {
+    export function hotReloadedPageObjectModelSrc() {
         var str = '';
-        for (const pomName in TrackedPoms) {
-            const pom = TrackedPoms[pomName];
+        for (const entryName in TrackedPageObjects) {
+            const pageEntry = TrackedPageObjects[entryName];
             
-            str += pom.content.replace(/\nwindow.PW_pages\[.*/, '') + '\n\n';
+            str += pageEntry.content.replace(/\nwindow.PW_pages\[.*/, '') + '\n\n';
         }
 
         return str;
