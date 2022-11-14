@@ -169,7 +169,7 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         return variableNames.flat();
     }
 
-    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
+    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
         try {
             await pageEvaluate(`window.PW_executing = true`);
             await evalScope(codeBlocks.join(''));
