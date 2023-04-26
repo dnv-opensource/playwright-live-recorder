@@ -45,7 +45,7 @@ export module pageObjectModel {
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
         const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
         let importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension
-        if (!(importPath.startsWith('.' || importPath.startsWith('/')))) importPath = './' + importPath;
+        if (!(importPath.startsWith('.') || importPath.startsWith('/'))) importPath = './' + importPath;
         return `import { ${className} } from '${importPath}';`
     }
 
