@@ -182,7 +182,7 @@ test('load dependency graph for test', async () => {
 `
 
 
-  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.after.ts');
   
   let proj = new Project(); //todo: figure out options that make this faster...
   proj.addSourceFileAtPath(testFilename);
