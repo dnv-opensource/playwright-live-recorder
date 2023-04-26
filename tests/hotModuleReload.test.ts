@@ -1,10 +1,8 @@
 import { ts, Project, ScriptTarget } from 'ts-morph';
-import * as typescript from 'typescript';
-import * as fs from 'node:fs/promises';
 import { hotModuleReload } from '../src/hotModuleReload';
-import * as nodePath from 'node:path';
+import nodePath from 'node:path';
 import { TestCallingLocation } from '../src/types';
-
+import { expect, test } from 'vitest';
 
 test('typescript transpile performance profiling', async () => {
 /*
@@ -114,7 +112,7 @@ test('typescript compile performance', async () => {
   expect(1).toEqual(2);
 });
 
-test.only('hotModuleReload reloadTestFile', async () => {
+test('hotModuleReload reloadTestFile', async () => {
   const testCallingLocation: TestCallingLocation = {
     file: `./tests/example-test-project/example.spec.before.ts`,
     testLine: `test('simple test', async ({ page }) => {`,

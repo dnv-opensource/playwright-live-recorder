@@ -1,11 +1,11 @@
-import * as _ from "lodash";
-import * as fs from "fs/promises";
-import * as nodePath from "node:path";
-import * as ts from "typescript";
-import * as chokidar from "chokidar";
+import _ from "lodash";
+import fs from "fs/promises";
+import nodePath from "node:path";
+import ts from "typescript";
+import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
-import * as AsyncLock from "async-lock";
+import AsyncLock from "async-lock";
 import { ModuleKind, Project } from "ts-morph";
 
 

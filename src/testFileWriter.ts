@@ -1,5 +1,5 @@
 import { Page } from "@playwright/test";
-import * as fs from "fs/promises";
+import fs from "fs/promises";
 import { Project, ts } from "ts-morph";
 import { TestCallingLocation } from "./types";
 

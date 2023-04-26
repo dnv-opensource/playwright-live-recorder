@@ -1,6 +1,6 @@
 import { Page } from "@playwright/test";
-import * as fs from "fs/promises";
-import * as chokidar from "chokidar";
+import fs from "fs/promises";
+import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_recorder } from "./types";
 
 //exposes selectorConventions pieces (load, watch and reload, prependRecordingRule method)

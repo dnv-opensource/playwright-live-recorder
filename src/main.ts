@@ -1,8 +1,8 @@
 import { Page, test } from "@playwright/test";
 
-import * as chokidar from "chokidar";
-import * as _ from "lodash";
-import * as nodePath from "node:path";
+import chokidar from "chokidar";
+import _ from "lodash";
+import nodePath from "node:path";
 
 import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
