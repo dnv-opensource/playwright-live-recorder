@@ -107,9 +107,6 @@ test('typescript compile performance', async () => {
   const f = proj.addSourceFileAtPath('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts');
   const imports = f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
   console.timeEnd('extract imports');
-
-
-  expect(1).toEqual(2);
 });
 
 test('hotModuleReload reloadTestFile', async () => {
