@@ -77,7 +77,9 @@ export class ${className} {
 
         const testCallingLocation = await getTestCallingLocation();
         await testFileWriter.init(page, testCallingLocation);
+        
         await hotModuleReload.init(testCallingLocation, (str: string) => page.evaluate(str), evalScope);
+        await page.exposeFunction('PW_eval', (codeBlocks: string[]) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlocks));
         
         await recorder.init(config.recorder, page);
 
