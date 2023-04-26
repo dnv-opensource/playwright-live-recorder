@@ -106,7 +106,7 @@ test('typescript compile performance', async () => {
 
   console.time('extract imports');
   let proj = new Project(options);
-  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  const f = proj.addSourceFileAtPath('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts');
   const imports = f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
   console.timeEnd('extract imports');
 
@@ -114,7 +114,7 @@ test('typescript compile performance', async () => {
   expect(1).toEqual(2);
 });
 
-test('hotModuleReload reloadTestFile', async () => {
+test.only('hotModuleReload reloadTestFile', async () => {
   const testCallingLocation: TestCallingLocation = {
     file: `./tests/example-test-project/example.spec.before.ts`,
     testLine: `test('simple test', async ({ page }) => {`,
@@ -128,21 +128,21 @@ test('hotModuleReload reloadTestFile', async () => {
   s.t.file = `./tests/example-test-project/example.spec.after.ts`;
   await hotModuleReload._reloadTestFile(s);
 
-  expect(evalText!).toEqual(
+  expect(evalText!.replace(/\r\n/g, "\n")).toEqual(
 `var { test, expect } = require('@playwright/test');
 var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
 
-//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.js transpiled
-function createGuid() {
+/*export*/ function createGuid() {
     return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
 }
-async function fnPromise() {
+/*export*/ async function fnPromise() {
     return await Promise.resolve(createGuid());
 }
 
 
-//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.js transpiled
-class intro_page {
+/*import { Page } from "@playwright/test";*/
+/*import { createGuid } from '../testHelpers';*/
+/*export*/ class intro_page {
     static title_selector = \`h1:has-text("Installation")\`;
     static title(page) { return page.locator(this.title_selector); }
     static home_selector = \`b:has-text("Playwright")\`;
@@ -156,7 +156,7 @@ class intro_page {
 (async function() {
   try {
     await expect(page).toHaveTitle('Google');
-    Object.assign(globalThis, { });
+
   } catch (err) {
     console.error(err);
   }
@@ -170,8 +170,7 @@ test('hotModuleReload _getBlockToExecute', async () => {
   const newFnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.after.ts', testDecl, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
  
   const blockToExecute = hotModuleReload._getBlockToExecute(fnContents, newFnContents);
-  const expectedNewBlock =
-`    await expect(page).toHaveTitle('Google');`;
+  const expectedNewBlock = `    await expect(page).toHaveTitle('Google');`;
 
   expect(blockToExecute).toEqual(expectedNewBlock);
 });

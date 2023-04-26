@@ -1,3 +1,4 @@
 node_modules/
 dist/
 dnvgl-playwright-live-recorder-*.tgz
+coverage/
