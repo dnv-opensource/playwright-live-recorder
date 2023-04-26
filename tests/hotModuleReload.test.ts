@@ -47,9 +47,9 @@ test('typescript transpile performance profiling', async () => {
   console.timeEnd('_emitInlinedDependencies');
   
   expect(allFiles).toEqual([
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
   ]);
 
   expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
@@ -80,9 +80,9 @@ test('typescript transpile performance profiling2', async () => {
   console.timeEnd('_emitInlinedDependencies');
   
   expect(allFiles).toEqual([
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
   ]);
 
   expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
@@ -94,12 +94,12 @@ test('typescript compile performance', async () => {
   
 /* 2.4s
    let proj = new Project(options);
-  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  const f = proj.addSourceFileAtPath('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts');
   f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove());
   const transpiled = proj.emitToMemory().getFiles()[0];
  */
 
-  //const src = await fs.readFile('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts', 'utf-8'); //3ms
+  //const src = await fs.readFile('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts', 'utf-8'); //3ms
   //const result = typescript.transpileModule(src.replace(/^import.*/gm,''), options); //65ms
 
   console.time('extract imports');
