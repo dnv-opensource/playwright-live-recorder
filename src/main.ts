@@ -75,7 +75,6 @@ export class ${className} {
     export async function start(page: Page, evalScope: (s: string) => any) {
         const pageState = <pageState><any>page;
         if (pageState.PlaywrightLiveRecorder_started === true) {
-            console.warn('starting again');
             return;
         }
 
