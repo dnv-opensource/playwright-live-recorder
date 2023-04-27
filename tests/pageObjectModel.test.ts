@@ -1,3 +1,4 @@
+import { test } from 'vitest';
 import { pageObjectModel } from '../src/pageObjectModel';
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from '../src/types';
 
