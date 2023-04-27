@@ -64,15 +64,30 @@ export class ${className} {
     let config: PlaywrightLiveRecorderConfig;
     export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: { overlay: {} }, diagnostic: {} };
 
+
+    /**
+     * used to track if `start` already called, if so, don't start again
+     */
+    type pageState = { PlaywrightLiveRecorder_started: boolean };
     /**
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
      */
     export async function start(page: Page, evalScope: (s: string) => any) {
+        const pageState = <pageState><any>page;
+        if (pageState.PlaywrightLiveRecorder_started === true) {
+            console.warn('starting again');
+            return;
+        }
+
+        pageState.PlaywrightLiveRecorder_started = true;
+
         const isHeadless = test.info().project.use.headless;
         if (isHeadless !== false) {
             console.error('startLiveCoding called while running headless');
             return;
         }
+
+
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
         const testCallingLocation = await getTestCallingLocation();
