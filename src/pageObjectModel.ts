@@ -29,7 +29,7 @@ export module pageObjectModel {
     const lock = new AsyncLock();
     export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
         _state = {testFileDir, config, page};
-        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
+        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url, config.aliases));
         await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(_state.config.path, pathFromRoot), _state.testFileDir));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
