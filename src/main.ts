@@ -21,7 +21,7 @@ export module PlaywrightLiveRecorder {
     export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
         recorder: {
             path: './PW_selectorConventions.js',
-
+            basepath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js'
         },
         pageObjectModel: {
             enabled: true,
@@ -41,7 +41,7 @@ export module PlaywrightLiveRecorder {
             },
             aliases: {},
             propertySelectorRegex: /(.+)_selector/,
-            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/,
+            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox|[Bb]utton)$/,
             generateClassTemplate: (className) =>
                 `import { Page } from "@playwright/test";
 
@@ -113,6 +113,7 @@ export class ${className} {
         }
 
         page.on('load', async page => {
+            await page.addScriptTag({ path: config.recorder.basepath });
             await page.addScriptTag({ path: config.recorder.path });
             await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
             await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });

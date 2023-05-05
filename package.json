@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tslint -p . && tsc && cpx \"src/**/*.{js,css,d.ts}\" dist && cpx \"example/**/*.*\" dist/example",
     "build-fast": "tsc && cpx \"src/**/*.{js,css,d.ts}\" dist && cpx \"example/**/*.*\" dist/example",
-    "test": "vitest"
+    "test": "vitest",
+    "postinstall": "cp example/* $INIT_CWD"
   },
   "devDependencies": {
     "@playwright/test": "^1.0.0",

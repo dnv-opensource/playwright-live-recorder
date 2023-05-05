@@ -67,6 +67,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
 type PlaywrightLiveRecorderConfig_recorder = {
     /** @default './PW_selectorConventions.js' */
     path: string,
+    /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
+    basepath: string,
 }
 
 type PlaywrightLiveRecorderConfig_diagnostic = {
