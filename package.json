@@ -5,16 +5,17 @@
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
   "main": "dist/main.js",
   "files": [
-    "dist/**/*.*"
+    "dist/**/*.*",
+    "postinstall.js"
   ],
   "repository": "https://github.com/dnv-opensource/playwright-live-recorder",
   "author": "DNV",
   "license": "MIT",
   "private": false,
   "scripts": {
-    "build": "tslint -p . && tsc && npx cpx \"src/**/*.{js,css,d.ts}\" dist && npx cpx \"example/**/*.*\" dist/example && npx cpx postinstall.js dist",
+    "build": "tslint -p . && tsc && npx cpx \"src/**/*.{js,css,d.ts}\" dist && npx cpx \"example/**/*.*\" dist/example",
     "test": "vitest",
-    "postinstall": "node postinstall.js"
+    "postinstall": "node -e \"const fs = require('node:fs'); const dest = process.env.INIT_CWD; fs.readdirSync('example').forEach(file => { try { fs.copyFileSync('example/' + file, dest + '/' + file, fs.constants.COPYFILE_EXCL); } catch(e) { if (e.code !== 'EEXIST') throw e; } });\""
   },
   "devDependencies": {
     "@playwright/test": "^1.0.0",
