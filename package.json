@@ -5,8 +5,7 @@
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder.",
   "main": "dist/main.js",
   "files": [
-    "dist/**/*.*",
-    "postinstall.js"
+    "dist/**/*.*"
   ],
   "repository": "https://github.com/dnv-opensource/playwright-live-recorder",
   "author": "DNV",
