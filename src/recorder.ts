@@ -1,6 +1,6 @@
 import { Page } from "@playwright/test";
-import * as fs from "fs/promises";
-import * as chokidar from "chokidar";
+import fs from "fs/promises";
+import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_recorder } from "./types";
 
 //exposes selectorConventions pieces (load, watch and reload, prependRecordingRule method)
@@ -8,6 +8,7 @@ export module recorder {
     export async function init(config: PlaywrightLiveRecorderConfig_recorder, page: Page) {
         await page.exposeFunction('PW_addRule', (matcherCode: string) => prependRecordingRule(config.path, matcherCode));
         await page.addScriptTag({ path: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' });
+        try { await page.addScriptTag({ path: config.basepath }); } catch(err) { if ((<any>err).code='ENOENT') return; throw err;}
         try { await page.addScriptTag({ path: config.path }); } catch(err) { if ((<any>err).code='ENOENT') return; throw err;}
 
         const watch = chokidar.watch(config.path);

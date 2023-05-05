@@ -1,10 +1,10 @@
 import { ts, Project, ImportDeclaration } from "ts-morph";
-import * as typescript from "typescript";
-import * as nodePath from "node:path";
-import * as chokidar from "chokidar";
-import * as AsyncLock from "async-lock";
-import * as fs from "node:fs/promises";
-import * as _ from "lodash";
+import typescript from "typescript";
+import nodePath from "node:path";
+import chokidar from "chokidar";
+import AsyncLock from "async-lock";
+import fs from "node:fs/promises";
+import _ from "lodash";
 
 import { TestCallingLocation } from "./types";
 
@@ -169,7 +169,7 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         return variableNames.flat();
     }
 
-    async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
+    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
         try {
             await pageEvaluate(`window.PW_executing = true`);
             await evalScope(codeBlocks.join(''));

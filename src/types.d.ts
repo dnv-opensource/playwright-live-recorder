@@ -15,15 +15,24 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     filenameConvention: string,
     /** @default (use.baseURL value from Playwright config) */
     baseUrl: string|undefined,
-    /** @default (url: string) => url
-    .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
-    .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
-    .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
-    .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
-    .replace(/\/$/, '') // clear trailing /
-        + '_page.ts',
+    /** @default (url: string, aliases: {[key: string]: string}) => {
+                let filePath = url
+                    .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
+                    .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
+                    .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                    .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
+                    .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
+                    .replace(/\/$/, ''); // clear trailing /
+                if (filePath in aliases) filePath = aliases[filePath]; //apply aliases
+                return filePath + '_page.ts';
+            }
     */
-    urlToFilePath: (url: string) => string,
+    urlToFilePath: (url: string, aliases: {[key: string]: string}) => string,
+    /**
+     * @remarks use to override/alias url fragments to page object model name
+     * @example { '': 'home', 'login/corporate' : 'login', 'login/personal' : 'login' } //redirect from root address to 'home' pom. use same pom for login/corporate and login/personal
+    */
+    aliases: {[key: string]: string},
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector/*/
     propertySelectorRegex: RegExp,
     /** @remarks Use this to identify methods that return elements @default /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/*/
@@ -58,6 +67,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
 type PlaywrightLiveRecorderConfig_recorder = {
     /** @default './PW_selectorConventions.js' */
     path: string,
+    /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
+    basepath: string,
 }
 
 type PlaywrightLiveRecorderConfig_diagnostic = {

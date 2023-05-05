@@ -1,11 +1,11 @@
-import * as _ from "lodash";
-import * as fs from "fs/promises";
-import * as nodePath from "node:path";
-import * as ts from "typescript";
-import * as chokidar from "chokidar";
+import _ from "lodash";
+import fs from "fs/promises";
+import nodePath from "node:path";
+import ts from "typescript";
+import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
-import * as AsyncLock from "async-lock";
+import AsyncLock from "async-lock";
 import { ModuleKind, Project } from "ts-morph";
 
 
@@ -29,7 +29,7 @@ export module pageObjectModel {
     const lock = new AsyncLock();
     export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
         _state = {testFileDir, config, page};
-        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url));
+        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url, config.aliases));
         await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(_state.config.path, pathFromRoot), _state.testFileDir));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
@@ -44,7 +44,8 @@ export module pageObjectModel {
 
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
         const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
-        const importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension
+        let importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension
+        if (!(importPath.startsWith('.') || importPath.startsWith('/'))) importPath = './' + importPath;
         return `import { ${className} } from '${importPath}';`
     }
 

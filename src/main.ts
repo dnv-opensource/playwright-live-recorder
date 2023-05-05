@@ -1,8 +1,8 @@
 import { Page, test } from "@playwright/test";
 
-import * as chokidar from "chokidar";
-import * as _ from "lodash";
-import * as nodePath from "node:path";
+import chokidar from "chokidar";
+import _ from "lodash";
+import nodePath from "node:path";
 
 import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
@@ -10,6 +10,8 @@ import { testFileWriter } from "./testFileWriter";
 import { hotModuleReload } from "./hotModuleReload";
 import { pageObjectModel } from "./pageObjectModel";
 import { getTestCallingLocation } from "./utility";
+import fs from 'fs/promises';
+import { ts } from "ts-morph";
 
 export type { PlaywrightLiveRecorderConfig };
 export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
@@ -19,32 +21,36 @@ export module PlaywrightLiveRecorder {
     export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
         recorder: {
             path: './PW_selectorConventions.js',
-
+            basepath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js'
         },
         pageObjectModel: {
             enabled: true,
             path: './tests/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string | undefined>undefined,
-            urlToFilePath: (url: string) => url
-                .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
-                .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
-                .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
-                .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
-                .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
-                .replace(/\/$/, '') // clear trailing /
-                + '_page.ts',
+            urlToFilePath: (url: string, aliases: {[key: string]: string}) => {
+                let filePath = url
+                    .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
+                    .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
+                    .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                    .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
+                    .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
+                    .replace(/\/$/, ''); // clear trailing /
+                if (filePath in aliases) filePath = aliases[filePath]; //apply aliases
+                return filePath + '_page.ts';
+            },
+            aliases: {},
             propertySelectorRegex: /(.+)_selector/,
-            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/,
-            generateClassTemplate: (className) => 
-`import { Page } from "@playwright/test";
+            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox|[Bb]utton)$/,
+            generateClassTemplate: (className) =>
+                `import { Page } from "@playwright/test";
 
 export class ${className} {
 
 }`,
-            generatePropertyTemplate: (name, selector) => 
-            `    private static ${name}_selector = \`${selector}\`;\r\n` + 
-            `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
+            generatePropertyTemplate: (name, selector) =>
+                `    private static ${name}_selector = \`${selector}\`;\r\n` +
+                `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
             overlay: {
                 color: 'salmon',
                 on: (el, config) => {
@@ -64,21 +70,37 @@ export class ${className} {
     let config: PlaywrightLiveRecorderConfig;
     export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: { overlay: {} }, diagnostic: {} };
 
+
+    /**
+     * used to track if `start` already called, if so, don't start again
+     */
+    type pageState = { PlaywrightLiveRecorder_started: boolean };
     /**
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
      */
     export async function start(page: Page, evalScope: (s: string) => any) {
+        const pageState = <pageState><any>page;
+        if (pageState.PlaywrightLiveRecorder_started === true) {
+            return;
+        }
+
+        pageState.PlaywrightLiveRecorder_started = true;
+
         const isHeadless = test.info().project.use.headless;
         if (isHeadless !== false) {
             console.error('startLiveCoding called while running headless');
             return;
         }
+
+
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
         const testCallingLocation = await getTestCallingLocation();
         await testFileWriter.init(page, testCallingLocation);
+
         await hotModuleReload.init(testCallingLocation, (str: string) => page.evaluate(str), evalScope);
-        
+        await page.exposeFunction('PW_eval', (codeBlocks: string[]) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlocks));
+
         await recorder.init(config.recorder, page);
 
         await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
@@ -91,6 +113,7 @@ export class ${className} {
         }
 
         page.on('load', async page => {
+            await page.addScriptTag({ path: config.recorder.basepath });
             await page.addScriptTag({ path: config.recorder.path });
             await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
             await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
@@ -107,6 +130,34 @@ export class ${className} {
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
+
+export let configFilePath = './live-recorder.config.ts';
+export async function _configFromFile() {
+    try {
+        const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
+        const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });
+        const cleanedUp = _cleanUpTranspiledSource(transpiled.outputText);
+        const obj = eval(cleanedUp);
+        return <PlaywrightLiveRecorderConfig | undefined>obj;
+    } catch (err) {
+        if ((<any>err).code === 'MODULE_NOT_FOUND') return;
+        console.error(err);
+    }
+}
+
+function _cleanUpTranspiledSource(transpiled: string) {
+    return transpiled
+        .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
+        .replace('export default ', '');
+}
+
+
+
+
+    /** _.merge({}, defaultConfig, configFromFile, configOverrides) */
+    function _mergeConfig(defaultConfig: PlaywrightLiveRecorderConfig, configFromFile: PlaywrightLiveRecorderConfig | undefined, configOverrides: PlaywrightLiveRecorderConfig) {
+        return _.merge({}, defaultConfig, configFromFile, configOverrides);
+    }
     async function PW_config() {
         //shenanigans to get regexp and functions to serialize reasonably
         (<any>RegExp.prototype).toJSON = RegExp.prototype.toString;
@@ -116,22 +167,6 @@ export class ${className} {
         delete (<any>Function.prototype).toJSON;
 
         return JSON.parse(result);
-    }
-
-    export let configFilePath = '../../../../live-recorder.config.ts';
-    async function _configFromFile() {
-        try {
-            const fileConfig = (await import(configFilePath))?.default;
-            return <PlaywrightLiveRecorderConfig | undefined>fileConfig;
-        } catch (err) {
-            if ((<any>err).code === 'MODULE_NOT_FOUND') return;
-            console.error(err);
-        }
-    }
-
-    /** _.merge({}, defaultConfig, configFromFile, configOverrides) */
-    function _mergeConfig(defaultConfig: PlaywrightLiveRecorderConfig, configFromFile: PlaywrightLiveRecorderConfig | undefined, configOverrides: PlaywrightLiveRecorderConfig) {
-        return _.merge({}, defaultConfig, configFromFile, configOverrides);
     }
 }
 

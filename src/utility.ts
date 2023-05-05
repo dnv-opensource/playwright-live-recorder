@@ -1,6 +1,6 @@
 import { test } from "@playwright/test";
-import * as ErrorStackParser from "error-stack-parser";
-import * as fs from "fs/promises";
+import ErrorStackParser from "error-stack-parser";
+import fs from "fs/promises";
 import { TestCallingLocation } from "./types";
 
 export async function getTestCallingLocation() {

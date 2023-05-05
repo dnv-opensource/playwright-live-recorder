@@ -1,5 +1,5 @@
 import { Page } from "@playwright/test";
-import * as fs from "fs/promises";
+import fs from "fs/promises";
 import { Project, ts } from "ts-morph";
 import { TestCallingLocation } from "./types";
 
@@ -18,7 +18,7 @@ export module testFileWriter {
             const imports = ast.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
             //todo: parse importStatement, only add the line if no pre-existing import from the source file
             const lastImportLine = Math.max(...imports.map(i => i.getEndLineNumber()));
-            testFileSrcLines.splice(lastImportLine + 1, 0, importStatement);
+            testFileSrcLines.splice(lastImportLine, 0, importStatement);
         }
 
         const testLineNumber = testFileSrcLines.indexOf(t.testLine);

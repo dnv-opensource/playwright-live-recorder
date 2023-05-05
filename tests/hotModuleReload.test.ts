@@ -1,10 +1,8 @@
 import { ts, Project, ScriptTarget } from 'ts-morph';
-import * as typescript from 'typescript';
-import * as fs from 'node:fs/promises';
 import { hotModuleReload } from '../src/hotModuleReload';
-import * as nodePath from 'node:path';
+import nodePath from 'node:path';
 import { TestCallingLocation } from '../src/types';
-
+import { expect, test } from 'vitest';
 
 test('typescript transpile performance profiling', async () => {
 /*
@@ -49,9 +47,9 @@ test('typescript transpile performance profiling', async () => {
   console.timeEnd('_emitInlinedDependencies');
   
   expect(allFiles).toEqual([
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
   ]);
 
   expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
@@ -82,9 +80,9 @@ test('typescript transpile performance profiling2', async () => {
   console.timeEnd('_emitInlinedDependencies');
   
   expect(allFiles).toEqual([
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/automated-test/playwright-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
   ]);
 
   expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
@@ -96,22 +94,19 @@ test('typescript compile performance', async () => {
   
 /* 2.4s
    let proj = new Project(options);
-  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  const f = proj.addSourceFileAtPath('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts');
   f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration).forEach(x => x.remove());
   const transpiled = proj.emitToMemory().getFiles()[0];
  */
 
-  //const src = await fs.readFile('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts', 'utf-8'); //3ms
+  //const src = await fs.readFile('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts', 'utf-8'); //3ms
   //const result = typescript.transpileModule(src.replace(/^import.*/gm,''), options); //65ms
 
   console.time('extract imports');
   let proj = new Project(options);
-  const f = proj.addSourceFileAtPath('C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.ts');
+  const f = proj.addSourceFileAtPath('C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts');
   const imports = f.getChildrenOfKind(ts.SyntaxKind.ImportDeclaration);
   console.timeEnd('extract imports');
-
-
-  expect(1).toEqual(2);
 });
 
 test('hotModuleReload reloadTestFile', async () => {
@@ -128,21 +123,21 @@ test('hotModuleReload reloadTestFile', async () => {
   s.t.file = `./tests/example-test-project/example.spec.after.ts`;
   await hotModuleReload._reloadTestFile(s);
 
-  expect(evalText!).toEqual(
+  expect(evalText!.replace(/\r\n/g, "\n")).toEqual(
 `var { test, expect } = require('@playwright/test');
 var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
 
-//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/testHelpers.js transpiled
-function createGuid() {
+/*export*/ function createGuid() {
     return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
 }
-async function fnPromise() {
+/*export*/ async function fnPromise() {
     return await Promise.resolve(createGuid());
 }
 
 
-//C:/_dev/automated-test/playwright-recorder/tests/example-test-project/docs/intro_page.js transpiled
-class intro_page {
+/*import { Page } from "@playwright/test";*/
+/*import { createGuid } from '../testHelpers';*/
+/*export*/ class intro_page {
     static title_selector = \`h1:has-text("Installation")\`;
     static title(page) { return page.locator(this.title_selector); }
     static home_selector = \`b:has-text("Playwright")\`;
@@ -156,7 +151,7 @@ class intro_page {
 (async function() {
   try {
     await expect(page).toHaveTitle('Google');
-    Object.assign(globalThis, { });
+
   } catch (err) {
     console.error(err);
   }
@@ -170,8 +165,7 @@ test('hotModuleReload _getBlockToExecute', async () => {
   const newFnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.after.ts', testDecl, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
  
   const blockToExecute = hotModuleReload._getBlockToExecute(fnContents, newFnContents);
-  const expectedNewBlock =
-`    await expect(page).toHaveTitle('Google');`;
+  const expectedNewBlock = `    await expect(page).toHaveTitle('Google');`;
 
   expect(blockToExecute).toEqual(expectedNewBlock);
 });
@@ -185,7 +179,7 @@ test('load dependency graph for test', async () => {
 `
 
 
-  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.after.ts');
   
   let proj = new Project(); //todo: figure out options that make this faster...
   proj.addSourceFileAtPath(testFilename);
