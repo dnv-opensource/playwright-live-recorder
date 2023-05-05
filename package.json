@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tslint -p . && tsc && npx cpx \"src/**/*.{js,css,d.ts}\" dist && npx cpx \"example/**/*.*\" dist/example",
     "test": "vitest",
-    "postinstall": "node -e \"const fs = require('node:fs'); const dest = process.env.INIT_CWD; fs.readdirSync('dist/example').forEach(file => { try { fs.copyFileSync('dist/example/' + file, dest + '/' + file, fs.constants.COPYFILE_EXCL); } catch(e) { if (e.code !== 'EEXIST') throw e; } });\""
+    "postinstall": "node -e \"if (!process.cwd().includes('node_modules')) return; const fs = require('node:fs'); const dest = process.env.INIT_CWD; fs.readdirSync('dist/example').forEach(file => { try { fs.copyFileSync('dist/example/' + file, dest + '/' + file, fs.constants.COPYFILE_EXCL); } catch(e) { if (e.code !== 'EEXIST') throw e; } });\""
   },
   "devDependencies": {
     "@playwright/test": "^1.0.0",
