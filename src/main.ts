@@ -41,7 +41,7 @@ export module PlaywrightLiveRecorder {
             },
             aliases: {},
             propertySelectorRegex: /(.+)_selector/,
-            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox|[Bb]utton)$/,
+            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox|[Bb]utton|[Ii]nput)$/,
             generateClassTemplate: (className) =>
                 `import { Page } from "@playwright/test";
 

@@ -226,7 +226,7 @@ function PW_reportError(summary, errorStack, doNotWrapDetails) {
     PW_eval_error.style.display = "none";
     return;
   }
-  if (errorStack != null) errorStack = errorStack.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  if (errorStack != null && !doNotWrapDetails) errorStack = errorStack.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   PW_eval_error.style.display = "block";
   PW_eval_error_summary.innerHTML = summary;
   PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
