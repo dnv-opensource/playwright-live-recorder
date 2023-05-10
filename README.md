@@ -12,7 +12,7 @@ Use at your discretion. This library is already very useful, but is certainly al
 ## Watch the video
 
 
-[![Getting Started](https://i9.ytimg.com/vi/73SnYrsrrTo/mq2.jpg?sqp=CLSq5qIG-oaymwEmCMACELQB8quKqQMa8AEB-AHUBoAC4AOKAgwIABABGCcgVShyMA8=&rs=AOn4CLCXaJacn5VadidIhkmTtKZClvPEOA)](https://youtu.be/73SnYrsrrTo)
+[![Getting Started](https://i.ytimg.com/vi/73SnYrsrrTo/maxresdefault.jpg)](https://youtu.be/73SnYrsrrTo)
 
 
 -----
