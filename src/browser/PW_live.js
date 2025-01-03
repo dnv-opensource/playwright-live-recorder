@@ -167,7 +167,7 @@ window.addEventListener("click", recordModeClickHandler, true);
 /******** page object model feature ********/
 
 window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
-window.setInternal(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
+window.setInterval(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
 
 
 var pageObjectFilePath = "";
