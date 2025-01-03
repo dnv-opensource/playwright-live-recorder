@@ -20,9 +20,10 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                     .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
                     .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
-                    .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
-                    .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
-                    .replace(/\/$/, ''); // clear trailing /
+                    .replaceAll('-', '_')       //replace all hyphens with underscores, valid classname
+                    .replaceAll('//', '/')      // if we end up with two // in a row, replace it with one
+                    .replace(/\/$/, '')         // clear trailing /
+                    .replace(/^\//, '');        // clear leading /
                 if (filePath in aliases) filePath = aliases[filePath]; //apply aliases
                 return filePath + '_page.ts';
             }
@@ -80,7 +81,7 @@ type PlaywrightLiveRecorderConfig_diagnostic = {
     hotReloadBrowserLibFiles: boolean,
 }
 
-type TestCallingLocation = { file: string, testLine: string, executingLine: string };
+type TestCallingLocation = { file: string, testLine: string, testLineNumber: number, executingLine: string };
 
 //type AddScriptTag_Args = Parameters<Page['addScriptTag']>[0];
 //type AddScriptTag_Return = ReturnType<Page['addScriptTag']>;

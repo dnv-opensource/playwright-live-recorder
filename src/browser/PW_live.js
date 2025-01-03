@@ -167,6 +167,8 @@ window.addEventListener("click", recordModeClickHandler, true);
 /******** page object model feature ********/
 
 window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
+window.setInternal(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
+
 
 var pageObjectFilePath = "";
 
@@ -191,7 +193,7 @@ async function reload_page_object_model_elements() {
       if (!selectorMethodName) continue;
 
       const selector = pageObject.page[prop];
-      const matchingElements = playwright.$$(selector);
+      const matchingElements = playwright.locator(selector).elements;
       if (matchingElements.length > 1) {
         //todo: show a warning somehow
       }

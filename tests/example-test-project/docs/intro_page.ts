@@ -1,6 +1,8 @@
 import { Page } from "@playwright/test";
 import { createGuid } from '../testHelpers';
 
+const doc = "abc";
+
 export class intro_page {
     private static title_selector = `h1:has-text("Installation")`;
     static title(page: Page) { return page.locator(this.title_selector); }

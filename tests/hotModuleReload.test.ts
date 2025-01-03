@@ -28,7 +28,7 @@ test('typescript transpile performance profiling', async () => {
         return ambientCode;
 */
   const options = { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } };
-  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.after.ts');
   
   console.time('_emitInlinedDependencies');
   let proj = new Project(options);
@@ -49,16 +49,38 @@ test('typescript transpile performance profiling', async () => {
   expect(allFiles).toEqual([
     "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
     "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.after.ts"
   ]);
 
-  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
+  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual([
+`//C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.js transpiled
+const doc = "abc";
+function createGuid() {
+    return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
+}
+async function fnPromise() {
+    return await Promise.resolve(createGuid());
+}
+`,
+`//C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.js transpiled
+const doc = "abc";
+class intro_page {
+    static title_selector = \`h1:has-text("Installation")\`;
+    static title(page) { return page.locator(this.title_selector); }
+    static home_selector = \`b:has-text("Playwright")\`;
+    static home(page) {
+        const iAmGuid = createGuid();
+        return page.locator(this.home_selector);
+    }
+}
+`,
+  ]);
 });
 
 
 test('typescript transpile performance profiling2', async () => {
   const options = { compilerOptions: { target: ts.ScriptTarget.ESNext, strict: false, skipLibCheck: true } };
-  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.before.ts');
+  const testFilename = nodePath.resolve('./tests/example-test-project/example.spec.after.ts');
 
   console.time('_emitInlinedDependencies');
   let proj = new Project(options);
@@ -80,12 +102,34 @@ test('typescript transpile performance profiling2', async () => {
   console.timeEnd('_emitInlinedDependencies');
   
   expect(allFiles).toEqual([
-    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.ts",
-    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.ts",
-    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.before.ts"
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.js",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.js",
+    "C:/_dev/playwright-live-recorder/tests/example-test-project/example.spec.after.js"
   ]);
 
-  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual(['abc', '123']);
+  expect(Object.values(inlinedDependencies).map(x => x.src)).toEqual([
+`//C:/_dev/playwright-live-recorder/tests/example-test-project/testHelpers.js transpiled
+const doc = "abc";
+function createGuid() {
+    return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
+}
+async function fnPromise() {
+    return await Promise.resolve(createGuid());
+}
+`,
+`//C:/_dev/playwright-live-recorder/tests/example-test-project/docs/intro_page.js transpiled
+const doc = "abc";
+class intro_page {
+    static title_selector = \`h1:has-text("Installation")\`;
+    static title(page) { return page.locator(this.title_selector); }
+    static home_selector = \`b:has-text("Playwright")\`;
+    static home(page) {
+        const iAmGuid = createGuid();
+        return page.locator(this.home_selector);
+    }
+}
+`,
+  ]);
 });
 
 test('typescript compile performance', async () => {
@@ -112,7 +156,8 @@ test('typescript compile performance', async () => {
 test('hotModuleReload reloadTestFile', async () => {
   const testCallingLocation: TestCallingLocation = {
     file: `./tests/example-test-project/example.spec.before.ts`,
-    testLine: `test('simple test', async ({ page }) => {`,
+    testLine: `    test('simple test', async ({ page }) => {`,
+    testLineNumber: 6,
     executingLine: `    await PlaywrightLiveRecorder.start(page, s => eval(s));`,
   };
   let evalText: string;
@@ -124,20 +169,11 @@ test('hotModuleReload reloadTestFile', async () => {
   await hotModuleReload._reloadTestFile(s);
 
   expect(evalText!.replace(/\r\n/g, "\n")).toEqual(
-`var { test, expect } = require('@playwright/test');
-var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
-
-/*export*/ function createGuid() {
-    return 'b87e0a22-6172-4dab-9643-1c170df1b0cd';
-}
-/*export*/ async function fnPromise() {
-    return await Promise.resolve(createGuid());
-}
-
-
-/*import { Page } from "@playwright/test";*/
-/*import { createGuid } from '../testHelpers';*/
-/*export*/ class intro_page {
+`//######## C:\\_dev\\playwright-live-recorder\\tests\\example-test-project\\docs\\intro_page.ts ########
+/*im { Page } from "@playwright/test";*/
+/*im { createGuid } from '../testHelpers';*/
+var doc = "abc";
+/*ex*/ class intro_page {
     static title_selector = \`h1:has-text("Installation")\`;
     static title(page) { return page.locator(this.title_selector); }
     static home_selector = \`b:has-text("Playwright")\`;
@@ -150,7 +186,9 @@ var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
 
 (async function() {
   try {
-    await expect(page).toHaveTitle('Google');
+        await expect(page).toHaveTitle('Google');
+        
+    
 
   } catch (err) {
     console.error(err);
@@ -161,13 +199,13 @@ var { PlaywrightLiveRecorder } = require('@dnvgl/playwright-live-recorder');
 test('hotModuleReload _getBlockToExecute', async () => {
   const testDecl = `test('simple test', async ({ page }) => {`;
 
-  const fnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.before.ts', testDecl, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
-  const newFnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.after.ts', testDecl, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
+  const fnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.before.ts', testDecl, 6, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
+  const newFnContents = (await hotModuleReload._extractFnContents('./tests/example-test-project/example.spec.after.ts', testDecl, 6, '    await PlaywrightLiveRecorder.start(page, s => eval(s));'))!;
  
   const blockToExecute = hotModuleReload._getBlockToExecute(fnContents, newFnContents);
-  const expectedNewBlock = `    await expect(page).toHaveTitle('Google');`;
+  const expectedNewBlock = `        await expect(page).toHaveTitle('Google');`;
 
-  expect(blockToExecute).toEqual(expectedNewBlock);
+  expect(blockToExecute.trimEnd()).toEqual(expectedNewBlock);
 });
 
 
@@ -194,7 +232,7 @@ test('load dependency graph for test', async () => {
   const r = proj.emitToMemory();
   const files = r.getFiles();
   const testFilenameJs = testFilename.replace(/\\/g, '/').replace(/\.ts$/, '.js');
-  const ambientCode = files.filter(f => f.filePath !== testFilenameJs).map(f => `//${f.filePath}\n${f.text.replace(/^export\s?/gm, '')}`).join('\n\n');
+  const ambientCode = files.filter(f => f.filePath !== testFilenameJs).map(f => `//${f.filePath}\n${f.text.replace(/^export\s?/gm, '').replaceAll(/const /gm, 'var ')}`).join('\n\n');
   const testCode = `
 //execute test lines here
 ${wrapAsyncAsPromise(newLinesToExecute, ['abc'])}`;

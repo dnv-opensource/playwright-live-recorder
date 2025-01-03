@@ -32,10 +32,13 @@ export module PlaywrightLiveRecorder {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
                     .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
-                    .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
+                    .replaceAll(/\/\d+(?=\/)/g, '/') // cut out /###/ fragments
+                    .replaceAll(/\/\d+\//g, '/') // cut out /###/ fragments if there were any left over
+                    .replaceAll(/\/\d+$/g, '/') // cut out /### fragments at end
                     .replaceAll('-', '_') //replace all hyphens with underscores, valid classname
-                    .replaceAll('//', '/') // if we end up with two // in a row, replace it with one
-                    .replace(/\/$/, ''); // clear trailing /
+                    .replaceAll(/\/\/+/g, '/') // if we end up with two // in a row, replace it with one
+                    .replace(/\/$/, '') // clear trailing /
+                    .replace(/^\//, ''); // clear leading /
                 if (filePath in aliases) filePath = aliases[filePath]; //apply aliases
                 return filePath + '_page.ts';
             },
@@ -71,6 +74,12 @@ export class ${className} {
     export let configOverrides: PlaywrightLiveRecorderConfig = <any><PlaywrightLiveRecorderConfigFile>{ recorder: {}, pageObjectModel: { overlay: {} }, diagnostic: {} };
 
 
+    /**
+     * proof of concept - pass `this` instead of `s => eval(s)`, seemed like error trapping and reporting stopped working though
+     */
+    export async function start2(page: Page, _this: any) {
+        return start(page, s => eval.apply(_this, [s]));
+    }
     /**
      * used to track if `start` already called, if so, don't start again
      */
