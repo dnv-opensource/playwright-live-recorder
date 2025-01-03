@@ -193,7 +193,7 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
                 console.error(error);
             }
         } finally {
-            await pageEvaluate(`window.PW_executing = false`);
+            await pageEvaluate(`window.PW_executing = false; window.reload_page_object_model_elements();`);
         }
     }
 
