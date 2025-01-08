@@ -44,7 +44,6 @@ export module hotModuleReload {
                 const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
                 if (blockToExecute === '')
                     return;
-
                 await evalLines(blockToExecute, s);
                 s.testFnContents = newTestFnContents;
             } finally {
@@ -95,7 +94,7 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
     export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
         try {
             await pageEvaluate(`window.PW_executing = true`);
-            await evalScope(codeBlocks.join(''));
+            await pTimeout(() => evalScope(codeBlocks.join('')), { milliseconds: 20_000, message: 'Timeout waiting for evalScope to complete for block:\n' + codeBlocks.join('') });
             await pageEvaluate(`PW_reportError()`);
         } catch (error) {
             if (error instanceof Error) {
@@ -108,6 +107,16 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         } finally {
             await pageEvaluate(`window.PW_executing = false; window.reload_page_object_model_elements();`);
         }
+    }
+
+    async function pTimeout(task: () => Promise<void>, options: { milliseconds: number, message: string }) {
+        return new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error(options.message)), options.milliseconds);
+    
+            task()
+            .then(() => { clearTimeout(timeout); resolve(); })
+            .catch((err) => { clearTimeout(timeout); reject(err); });
+        });
     }
 
     export function _extractImports(filename: string) {
