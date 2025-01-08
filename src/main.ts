@@ -13,6 +13,7 @@ import { getTestCallingLocation } from "./utility";
 import fs from 'fs/promises';
 import { ts } from "ts-morph";
 
+
 export type { PlaywrightLiveRecorderConfig };
 export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
 
@@ -44,7 +45,17 @@ export module PlaywrightLiveRecorder {
             },
             aliases: {},
             propertySelectorRegex: /(.+)_selector/,
-            isElementPropertyRegex: /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox|[Bb]utton|[Ii]nput)$/,
+            primaryActionByCssSelector: [
+                ['input[type="text"], input[type=""], textarea', 'await $1.fill("");'],
+                ['*', 'await $1.click();']
+            ],
+            secondaryActionByCssSelector: [
+                ['input[type="text"], textarea', 'await expect($1.innerText()).toContain("");'],
+                /// available on all element types
+                ['*', 'await expect($1.innerText()).toContain("");'],
+                ['*', 'await expect($1).toBeVisible();'],
+                ['*', 'await expect($1).toBeEnabled();']
+            ],
             generateClassTemplate: (className) =>
                 `import { Page } from "@playwright/test";
 
@@ -61,7 +72,35 @@ export class ${className} {
                     el.style.background = config.pageObjectModel.overlay.color;
                 },
                 off: (el) => el.style.background = el.getAttribute('data-background') ?? '',
-            }
+            },
+            importerCustomizationHooks: `data:text/javascript,
+                import { promises as fs } from 'fs';
+                import { fileURLToPath } from 'url';
+                
+                const resolvedFilenames = new Set();
+                
+                export async function resolve(specifier, context, nextResolve) {
+                  const resolved = await nextResolve(specifier, context);
+                  if (!resolved.url.endsWith('.ts')) return resolved;
+                
+                  const urlFilename = fileURLToPath(resolved.url);
+                  const modifyMs = await fs.stat(urlFilename).then(stat => Math.floor(stat.mtimeMs));
+                  resolved.url = resolved.url.replace(/.ts$/, '.cachebust.' + modifyMs + '.ts');
+                  return resolved;
+                }
+                
+                export async function load(url, context, nextLoad) {
+                  const original = url.replace(/\\.cachebust\\.\\d+.ts$/, '.ts');
+                  if (original === url || resolvedFilenames.has(url)) return await nextLoad(url, context);
+                  const urlFilename = fileURLToPath(url);
+                  const originalFilename = fileURLToPath(original);
+                  await fs.copyFile(originalFilename, urlFilename);
+                  const result = await nextLoad(url, context);
+                  await fs.rm(urlFilename);
+                  resolvedFilenames.add(url);
+                  return result;
+                }
+                `
         },
         diagnostic: {
             browserCodeJSPath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.js',
@@ -92,7 +131,6 @@ export class ${className} {
         if (pageState.PlaywrightLiveRecorder_started === true) {
             return;
         }
-
         pageState.PlaywrightLiveRecorder_started = true;
 
         const isHeadless = test.info().project.use.headless;
@@ -101,13 +139,12 @@ export class ${className} {
             return;
         }
 
-
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
         const testCallingLocation = await getTestCallingLocation();
         await testFileWriter.init(page, testCallingLocation);
 
-        await hotModuleReload.init(testCallingLocation, (str: string) => page.evaluate(str), evalScope);
+        await hotModuleReload.init(testCallingLocation, config.pageObjectModel.importerCustomizationHooks, (str: string) => page.evaluate(str), evalScope);
         await page.exposeFunction('PW_eval', (codeBlocks: string[]) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlocks));
 
         await recorder.init(config.recorder, page);
@@ -139,26 +176,25 @@ export class ${className} {
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });
     }
 
-
-export let configFilePath = './live-recorder.config.ts';
-export async function _configFromFile() {
-    try {
-        const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
-        const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });
-        const cleanedUp = _cleanUpTranspiledSource(transpiled.outputText);
-        const obj = eval(cleanedUp);
-        return <PlaywrightLiveRecorderConfig | undefined>obj;
-    } catch (err) {
-        if ((<any>err).code === 'MODULE_NOT_FOUND') return;
-        console.error(err);
+    export let configFilePath = './live-recorder.config.ts';
+    export async function _configFromFile() {
+        try {
+            const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
+            const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });
+            const cleanedUp = _cleanUpTranspiledSource(transpiled.outputText);
+            const obj = eval(cleanedUp);
+            return <PlaywrightLiveRecorderConfig | undefined>obj;
+        } catch (err) {
+            if ((<any>err).code === 'MODULE_NOT_FOUND') return;
+            console.error(err);
+        }
     }
-}
 
-function _cleanUpTranspiledSource(transpiled: string) {
-    return transpiled
-        .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
-        .replace('export default ', '');
-}
+    function _cleanUpTranspiledSource(transpiled: string) {
+        return transpiled
+            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
+            .replace('export default ', '');
+    }
 
 
 

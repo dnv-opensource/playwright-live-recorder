@@ -36,8 +36,10 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     aliases: {[key: string]: string},
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector/*/
     propertySelectorRegex: RegExp,
-    /** @remarks Use this to identify methods that return elements @default /.+([Ee]lement|[Ll]ocator|[Cc]ombo[Bb]ox)$/*/
-    isElementPropertyRegex: RegExp,
+    /** @remarks Use this to specify the text appended when LEFT clicked on in record mode @default [ ["input[type="text"]", 'fill()'], ["textarea", 'fill()'], ["/.*\/", "click()"] ] */
+    primaryActionByCssSelector: [string, string][],
+    /** @remarks Use this to specify the text appended when RIGHT clicked on in record mode @default [ ["input[type="text"]", "await expect($1.innerText()).toContain('')"], ["textarea", "innerText().toContain('')"], ["/.*\/", ""]]*/
+    secondaryActionByCssSelector: [string, string][],
     /** @default (className) => 
     `import { Page } from "@playwright/test";
 
@@ -62,7 +64,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
         on: (el: HTMLElement, config: PlaywrightLiveRecorderConfig) => void,
         /** @default (el) => el.style.background = el.getAttribute('data-background') ?? '', */
         off: (el: HTMLElement) => void,
-    }
+    },
+    importerCustomizationHooks: string,
 }
 
 type PlaywrightLiveRecorderConfig_recorder = {

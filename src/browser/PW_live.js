@@ -85,8 +85,23 @@ function toggleRecordMode(checked) {
 
 function updateTooltipContents(element) {
   const convention = document.PW_getSelectorConventionForElement(element);
+  if (convention == undefined) return;
+
   const matcher = convention.match(element);
-  PW_tooltip.innerText = typeof matcher === "string" ? matcher : JSON.stringify(matcher, undefined, "\t");
+  if (matcher == undefined) return;
+
+  if (!convention.isPageObjectModel) {
+    PW_tooltip.innerText = typeof matcher === "string" ? matcher : JSON.stringify(matcher, undefined, "\t");
+  } else {
+    const primaryAction = element.closest('[data-page-object-model-primary-action]').getAttribute("data-page-object-model-primary-action");
+    if (primaryAction == undefined) return;
+
+    //todo - secondary actions
+    //const secondaryActions = element.closest('[data-page-object-model-secondary-actions]').getAttribute("data-page-object-model-secondary-actions");
+    const output = convention.output ? convention.output(matcher) : matcher;
+    PW_tooltip.innerText = primaryAction.replaceAll('$1', output);
+    //todo - secondary actions
+  }
 }
 
 function updateTooltipPosition(x, y) {
@@ -142,17 +157,20 @@ async function recordModeClickHandler(event) {
       const selector = selectorConvention.match(element);
       await PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
     }
+    return;
   }
-  if (newItemName != null) return;
 
-  const resultOutput = selectorConvention.output(selectorConvention.match(element));
-  PW_repl.value = resultOutput;
+  const resultOutput = selectorConvention.output ? selectorConvention.output(selectorConvention.match(element)) : selectorConvention.match(element);
+  const primaryAction = element.closest('[data-page-object-model-primary-action]').getAttribute("data-page-object-model-primary-action");
+  //todo - implement secondary actions
+  const replLine = primaryAction.replaceAll('$1', resultOutput);
+  PW_repl.value = replLine;
   PW_repl.disabled = false;
 
   if (selectorConvention.isPageObjectModel) {
-    await PW_appendToTest(resultOutput, element.getAttribute("data-page-object-model-import"));
+    await PW_appendToTest(replLine, element.closest('[data-page-object-model-import]').getAttribute("data-page-object-model-import"));
   } else {
-    await PW_appendToTest(resultOutput);
+    await PW_appendToTest(replLine);
   }
 }
 
@@ -185,7 +203,6 @@ async function reload_page_object_model_elements() {
   if (pageObject === undefined) return;
 
   const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
-  const isElementPropertyRegex = new RegExp(config.pageObjectModel.isElementPropertyRegex.slice(1, -1));
   const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
   for (var prop in pageObject.page) {
     try {
@@ -204,11 +221,15 @@ async function reload_page_object_model_elements() {
 
       const selectorMethod = "" + pageObject.page[selectorMethodName].toString();
       const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf("("), selectorMethod.indexOf(")") + 1);
-      const isElementProperty = isElementPropertyRegex.test(selectorMethodName);
-      const dataPageObjectModel = `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}${isElementProperty ? '.click()' : ''}`;
+      const primaryAction = config.pageObjectModel.primaryActionByCssSelector.find(([css]) => matchingElements[0].matches(css))[1];
+      const secondaryActions = config.pageObjectModel.secondaryActionByCssSelector.filter(([css]) => matchingElements[0].matches(css)).map(([, action]) => action);
+      const dataPageObjectModel = `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`;
       for (const el of matchingElements) {
         el.setAttribute("data-page-object-model", dataPageObjectModel);
         el.setAttribute("data-page-object-model-import", pageObjectModelImportStatement);
+        
+        el.setAttribute("data-page-object-model-primary-action", primaryAction);
+        el.setAttribute("data-page-object-model-secondary-actions", encodeURIComponent(JSON.stringify(secondaryActions)));
         config.pageObjectModel.overlay.on(el, config);
         PW_overlays.push(el);
       }
