@@ -29,6 +29,7 @@ export module PlaywrightLiveRecorder {
             path: './tests/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string | undefined>undefined,
+            actionTimeout: 5000,
             urlToFilePath: (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
@@ -57,7 +58,7 @@ export module PlaywrightLiveRecorder {
                 ['*', 'await expect($1).toBeEnabled();']
             ],
             generateClassTemplate: (className) =>
-                `import { Page } from "@playwright/test";
+                `import type { Page } from '@playwright/test';
 
 export class ${className} {
 
@@ -141,6 +142,8 @@ export class ${className} {
 
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
 
+        page.setDefaultTimeout(config.pageObjectModel.actionTimeout);
+
         const testCallingLocation = await getTestCallingLocation();
         await testFileWriter.init(page, testCallingLocation);
 
@@ -178,6 +181,7 @@ export class ${className} {
 
     export let configFilePath = './live-recorder.config.ts';
     export async function _configFromFile() {
+        //todo - try rewriting to use dynamic import instead
         try {
             const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
             const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });

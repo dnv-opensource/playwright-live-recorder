@@ -15,6 +15,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     filenameConvention: string,
     /** @default (use.baseURL value from Playwright config) */
     baseUrl: string|undefined,
+    /** @default 5000 */
+    actionTimeout: number,
     /** @default (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
