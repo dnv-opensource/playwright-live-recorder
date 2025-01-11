@@ -147,7 +147,7 @@ export module pageObjectModel {
     }
     
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
-    function fullRelativePath(path: string, config: { path: string }) { return nodePath.join(config.path, path); }
+    function fullRelativePath(path: string, config: { path: string }) { return path.normalize(nodePath.join(config.path, path)); }
 
     export function hotReloadedPageObjectModelSrc() {
         var str = '';

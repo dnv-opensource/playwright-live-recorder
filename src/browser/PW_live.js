@@ -230,7 +230,7 @@ async function reload_page_object_model_elements() {
         
         el.setAttribute("data-page-object-model-primary-action", primaryAction);
         el.setAttribute("data-page-object-model-secondary-actions", encodeURIComponent(JSON.stringify(secondaryActions)));
-        config.pageObjectModel.overlay.on(el, config);
+        config.pageObjectModel.overlay.on(el, config.pageObjectModel.overlay.color);
         PW_overlays.push(el);
       }
     } catch (err) {
