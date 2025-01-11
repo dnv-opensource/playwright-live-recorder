@@ -1,12 +1,22 @@
 import { Page } from "@playwright/test"
 
-type PlaywrightLiveRecorderConfig = {
+export type PlaywrightLiveRecorderConfig = {
     recorder: PlaywrightLiveRecorderConfig_recorder,
     pageObjectModel: PlaywrightLiveRecorderConfig_pageObjectModel,
     diagnostic: PlaywrightLiveRecorderConfig_diagnostic,
 };
 
-type PlaywrightLiveRecorderConfig_pageObjectModel = {
+type RecursivePartial<T> = {
+    [P in keyof T]?:
+    T[P] extends (infer U)[] ? RecursivePartial<U>[] :
+    T[P] extends object ? RecursivePartial<T[P]> :
+    T[P];
+};
+
+
+export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
+
+export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     /** @default true */
     enabled: boolean,
     /** @default './tests/' */
@@ -15,6 +25,8 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     filenameConvention: string,
     /** @default (use.baseURL value from Playwright config) */
     baseUrl: string|undefined,
+    /** @default 5000 */
+    actionTimeout: number,
     /** @default (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
@@ -56,26 +68,26 @@ type PlaywrightLiveRecorderConfig_pageObjectModel = {
     overlay: {
         /** @default 'salmon' */
         color: string,
-        /** @default (el, config) => {
+        /** @default (el, color) => {
             el.setAttribute('data-background', el.style.background);
-            el.style.background = config.pageObjectModel.overlay.color;
+            el.style.background = color;
         },
         */
-        on: (el: HTMLElement, config: PlaywrightLiveRecorderConfig) => void,
+        on: (el: HTMLElement, color: string) => void,
         /** @default (el) => el.style.background = el.getAttribute('data-background') ?? '', */
         off: (el: HTMLElement) => void,
     },
     importerCustomizationHooks: string,
 }
 
-type PlaywrightLiveRecorderConfig_recorder = {
+export type PlaywrightLiveRecorderConfig_recorder = {
     /** @default './PW_selectorConventions.js' */
     path: string,
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
     basepath: string,
 }
 
-type PlaywrightLiveRecorderConfig_diagnostic = {
+export type PlaywrightLiveRecorderConfig_diagnostic = {
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.js' */
     browserCodeJSPath: string,
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_live.css' */
@@ -84,7 +96,4 @@ type PlaywrightLiveRecorderConfig_diagnostic = {
     hotReloadBrowserLibFiles: boolean,
 }
 
-type TestCallingLocation = { file: string, testLine: string, testLineNumber: number, executingLine: string };
-
-//type AddScriptTag_Args = Parameters<Page['addScriptTag']>[0];
-//type AddScriptTag_Return = ReturnType<Page['addScriptTag']>;
+export type TestCallingLocation = { file: string, testLine: string, testLineNumber: number, executingLine: string };

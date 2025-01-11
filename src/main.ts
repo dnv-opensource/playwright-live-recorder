@@ -4,7 +4,6 @@ import chokidar from "chokidar";
 import _ from "lodash";
 import nodePath from "node:path";
 
-import { PlaywrightLiveRecorderConfig } from "./types";
 import { recorder } from "./recorder";
 import { testFileWriter } from "./testFileWriter";
 import { hotModuleReload } from "./hotModuleReload";
@@ -12,14 +11,12 @@ import { pageObjectModel } from "./pageObjectModel";
 import { getTestCallingLocation } from "./utility";
 import fs from 'fs/promises';
 import { ts } from "ts-morph";
+import { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile } from "./types";
 
-
-export type { PlaywrightLiveRecorderConfig };
-export type PlaywrightLiveRecorderConfigFile = RecursivePartial<PlaywrightLiveRecorderConfig>;
+//github copilot directive: for the defaultConfig property - add inline jsdoc @default attributes for each property below, have the @default value match the actual values of each property
 
 export module PlaywrightLiveRecorder {
-    /** {@inheritDoc PlaywrightLiveRecorderConfig} */
-    export const defaultConfig: PlaywrightLiveRecorderConfig = { //note: please update types.d.ts when defaults are updated
+    export const defaultConfig: PlaywrightLiveRecorderConfig = {
         recorder: {
             path: './PW_selectorConventions.js',
             basepath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js'
@@ -29,6 +26,7 @@ export module PlaywrightLiveRecorder {
             path: './tests/',
             filenameConvention: '**/*_page.ts',
             baseUrl: <string | undefined>undefined,
+            actionTimeout: 5000,
             urlToFilePath: (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
@@ -56,22 +54,22 @@ export module PlaywrightLiveRecorder {
                 ['*', 'await expect($1).toBeVisible();'],
                 ['*', 'await expect($1).toBeEnabled();']
             ],
-            generateClassTemplate: (className) =>
-                `import { Page } from "@playwright/test";
+            generateClassTemplate: (className: string) =>
+                `import type { Page } from '@playwright/test';
 
 export class ${className} {
 
 }`,
-            generatePropertyTemplate: (name, selector) =>
+            generatePropertyTemplate: (name: string, selector: string) =>
                 `    private static ${name}_selector = \`${selector}\`;\r\n` +
                 `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
             overlay: {
                 color: 'salmon',
-                on: (el, config) => {
+                on: (el: HTMLElement, color: string) => {
                     el.setAttribute('data-background', el.style.background);
-                    el.style.background = config.pageObjectModel.overlay.color;
+                    el.style.background = color ?? 'salmon';
                 },
-                off: (el) => el.style.background = el.getAttribute('data-background') ?? '',
+                off: (el: HTMLElement) => el.style.background = el.getAttribute('data-background') ?? '',
             },
             importerCustomizationHooks: `data:text/javascript,
                 import { promises as fs } from 'fs';
@@ -114,17 +112,11 @@ export class ${className} {
 
 
     /**
-     * proof of concept - pass `this` instead of `s => eval(s)`, seemed like error trapping and reporting stopped working though
-     */
-    export async function start2(page: Page, _this: any) {
-        return start(page, s => eval.apply(_this, [s]));
-    }
-    /**
      * used to track if `start` already called, if so, don't start again
      */
     type pageState = { PlaywrightLiveRecorder_started: boolean };
     /**
-     * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, etc
+     * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, relative import paths, etc
      */
     export async function start(page: Page, evalScope: (s: string) => any) {
         const pageState = <pageState><any>page;
@@ -140,6 +132,9 @@ export class ${className} {
         }
 
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
+        if (!config.pageObjectModel.path.endsWith('/')) config.pageObjectModel.path +='/';
+
+        page.setDefaultTimeout(config.pageObjectModel.actionTimeout);
 
         const testCallingLocation = await getTestCallingLocation();
         await testFileWriter.init(page, testCallingLocation);
@@ -178,6 +173,7 @@ export class ${className} {
 
     export let configFilePath = './live-recorder.config.ts';
     export async function _configFromFile() {
+        //todo - try rewriting to use dynamic import instead
         try {
             const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
             const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });
@@ -214,10 +210,3 @@ export class ${className} {
         return JSON.parse(result);
     }
 }
-
-type RecursivePartial<T> = {
-    [P in keyof T]?:
-    T[P] extends (infer U)[] ? RecursivePartial<U>[] :
-    T[P] extends object ? RecursivePartial<T[P]> :
-    T[P];
-};
