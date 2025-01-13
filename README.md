@@ -1,5 +1,13 @@
-### 🛑 Note: this library is incomplete, and in active development 🛑
-Use at your discretion. This library is already very useful, but is certainly also riddled with bugs.
+### Update v2.0.48
+* Live code execution method much simplified and much more robust (todo: write tech doc about this)
+
+### Next
+* bugfix: Make page object model tools build correct paths on non-windows filesystems
+* tech debt: Clean up messy/buggy code around parts not related to live code execution
+* tech debt: ui cleanup - remove executing line, make recording ui more similar to playwright codegen
+* feature: Add awareness of helper methods to PageObjectModel visualization (e.g. tabs at bottom of page)
+* feature: Add secondary commands via right-click to recorder
+* enhancement: Figure out how to make extensible selector code more user-friendly to edit and modify
 
 ----
 
@@ -70,7 +78,7 @@ import { PlaywrightLiveRecorder } from '@dnvgl/playwright-live-recorder';
 and then add this line at the end of the playwright test you want to record into
 ``` ts
 // recorded lines will be inserted here
-await PlaywrightLiveRecorder.start(page, s => eval(s));
+await PlaywrightLiveRecorder.start(page, s => <undefined>eval(s));
 ```
 
 Run the test in headed mode
@@ -81,7 +89,8 @@ Run the test in headed mode
 
 
 Test will run, when `PlaywrightLiveRecorder.start` line is executed lib functionality will be exposed to the browser and all scripts will be loaded in the browser. Test execution waits until browser is closed.  
-Newly recorded test lines are inserted into test file.
+Newly recorded test lines are inserted into test file.  
+Test lines added above `PlaywrightLiveRecorder.start` are executed upon file save.
 
 ## Browser
 
@@ -98,7 +107,7 @@ Newly recorded test lines are inserted into test file.
 > With record toggled on, click an element to add it to your test
 > * If the element is not part of the Page Object Model, you will be prompted to give it a name
 >   * Press enter and the new property will be added to the page object model file, and the element will highlight (default: salmon color), to indicate it's a part of the page object model
->   * Press [esc] to skip adding to the page object model, and the code will be added directly to your test
+>   * Press [esc] to skip adding to the page object model
 > * If the element is part of the Page Object Model, it will already be highlighted salmon color
 >   * Clicking it will add a call to the page object model method to your test
 
