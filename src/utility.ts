@@ -1,8 +1,8 @@
 import { test } from "@playwright/test";
 import ErrorStackParser from "error-stack-parser";
 import fs from "fs/promises";
-import path from "path";
-import url from "url";
+import path from "node:path";
+import url from "node:url";
 import { TestCallingLocation } from "./types";
 
 export async function getTestCallingLocation() {

@@ -10,10 +10,10 @@ import { hotModuleReload } from "./hotModuleReload";
 import { pageObjectModel } from "./pageObjectModel";
 import { getTestCallingLocation } from "./utility";
 import fs from 'fs/promises';
+import process from 'node:process';
 import { ts } from "ts-morph";
-import { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile } from "./types";
-
-//github copilot directive: for the defaultConfig property - add inline jsdoc @default attributes for each property below, have the @default value match the actual values of each property
+import { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile, PlaywrightLiveRecorderConfig_recorder, PlaywrightLiveRecorderConfig_pageObjectModel, PlaywrightLiveRecorderConfig_diagnostic, TestCallingLocation } from "./types";
+export { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile, PlaywrightLiveRecorderConfig_recorder, PlaywrightLiveRecorderConfig_pageObjectModel, PlaywrightLiveRecorderConfig_diagnostic, TestCallingLocation };
 
 export module PlaywrightLiveRecorder {
     export const defaultConfig: PlaywrightLiveRecorderConfig = {
@@ -126,11 +126,11 @@ export class ${className} {
         pageState.PlaywrightLiveRecorder_started = true;
 
         const isHeadless = test.info().project.use.headless;
-        if (isHeadless !== false) {
-            console.error('startLiveCoding called while running headless');
+        const pwdebug = process.env.PWDEBUG == 'console';
+        if (isHeadless !== false && !pwdebug) {
+            console.error('startLiveCoding called while running headless or env variable PWDEBUG=console not set');
             return;
         }
-
         config = _mergeConfig(defaultConfig, await _configFromFile(), configOverrides);
         if (!config.pageObjectModel.path.endsWith('/')) config.pageObjectModel.path +='/';
 
@@ -140,7 +140,7 @@ export class ${className} {
         await testFileWriter.init(page, testCallingLocation);
 
         await hotModuleReload.init(testCallingLocation, config.pageObjectModel.importerCustomizationHooks, (str: string) => page.evaluate(str), evalScope);
-        await page.exposeFunction('PW_eval', (codeBlocks: string[]) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlocks));
+        await page.exposeFunction('PW_eval', (codeBlock: string) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlock));
 
         await recorder.init(config.recorder, page);
 
@@ -150,7 +150,7 @@ export class ${className} {
 
         if (config.pageObjectModel.enabled) {
             config.pageObjectModel.baseUrl = config.pageObjectModel.baseUrl ?? test.info().project.use.baseURL!;
-            await pageObjectModel.init(nodePath.dirname(testCallingLocation.file), config.pageObjectModel, page);
+            await pageObjectModel.init(nodePath.dirname(testCallingLocation.file), config.pageObjectModel, evalScope, page);
         }
 
         page.on('load', async page => {

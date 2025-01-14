@@ -115,7 +115,7 @@ function updateTooltipPosition(x, y) {
 
 window.mousemove_updateToolTip_running = false;
 function mousemove_updateTooltip(event) {
-  if (mousemove_updateToolTip_running === true) return; //exit early so we don't sawmp the CPU
+  if (mousemove_updateToolTip_running === true) return; //exit early so we don't swamp the CPU
   try {
     mousemove_updateToolTip_running = true;
     const element = document.elementFromPoint(event.x, event.y);
@@ -185,7 +185,7 @@ window.addEventListener("click", recordModeClickHandler, true);
 /******** page object model feature ********/
 
 window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
-window.setInterval(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
+//window.setInterval(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
 
 
 var pageObjectFilePath = "";
@@ -202,28 +202,21 @@ async function reload_page_object_model_elements() {
   const pageObject = window.PW_pages[pageObjectFilePath];
   if (pageObject === undefined) return;
 
-  const propertyRegex = new RegExp(config.pageObjectModel.propertySelectorRegex.slice(1, -1));
   const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
-  for (var prop in pageObject.page) {
+  for (var prop of pageObject.selectors) {
     try {
-      const selectorMethodName = propertyRegex.exec(prop)?.[1];
-      if (!selectorMethodName) continue;
-
-      const selector = pageObject.page[prop];
-      const matchingElements = playwright.locator(selector).elements;
+      const matchingElements = playwright.locator(prop.selector).elements;
       if (matchingElements.length > 1) {
         //todo: show a warning somehow
       }
       if (matchingElements.length === 0) {
-        console.info(`could not find element for selector ${selector}. skipping.`);
+        console.info(`could not find element for selector ${prop.selector}. skipping.`);
         continue;
       }
 
-      const selectorMethod = "" + pageObject.page[selectorMethodName].toString();
-      const selectorMethodArgs = selectorMethod.slice(selectorMethod.indexOf("("), selectorMethod.indexOf(")") + 1);
       const primaryAction = config.pageObjectModel.primaryActionByCssSelector.find(([css]) => matchingElements[0].matches(css))[1];
       const secondaryActions = config.pageObjectModel.secondaryActionByCssSelector.filter(([css]) => matchingElements[0].matches(css)).map(([, action]) => action);
-      const dataPageObjectModel = `${pageObject.className}.${selectorMethodName}${selectorMethodArgs}`;
+      const dataPageObjectModel = `${pageObject.className}.${prop.selectorMethod.name}(${prop.selectorMethod.args.join(', ')})`;
       for (const el of matchingElements) {
         el.setAttribute("data-page-object-model", dataPageObjectModel);
         el.setAttribute("data-page-object-model-import", pageObjectModelImportStatement);
@@ -241,6 +234,12 @@ async function reload_page_object_model_elements() {
 
 function clearPageObjectModelElements() {
   if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
+  //clean up any rogue elements
+  const pageObjectModelAttributes = ['data-page-object-model', 'data-page-object-model-import', 'data-page-object-model-primary-action', 'data-page-object-model-secondary-actions'];
+  document.querySelectorAll(pageObjectModelAttributes.join(', ')).forEach(el => {
+    pageObjectModelAttributes.forEach(attr => el.removeAttribute(attr));
+    config.pageObjectModel.overlay.off(el)
+  });
   window.PW_overlays = [];
 }
 

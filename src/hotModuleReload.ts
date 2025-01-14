@@ -44,7 +44,7 @@ export module hotModuleReload {
                 const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
                 if (blockToExecute === '')
                     return;
-                await evalLines(blockToExecute, s);
+                await evalLines(blockToExecute);
                 s.testFnContents = newTestFnContents;
             } finally {
                 release();
@@ -52,10 +52,10 @@ export module hotModuleReload {
         });
     }
 
-    async function evalLines(lines: string, s: hotModuleReloadState) {
-        const importsBlock = _rewriteAsDynamicImports(s.imports).join('\n');
+    async function evalLines(lines: string) {
+        const importsBlock = _rewriteAsDynamicImports(_state.imports).join('\n');
         const wrappedEvalLines = _wrapAsyncAsPromise(importsBlock + '\n\n' + lines, _extractVariableListFrom(lines));
-        await _evalCore(s.evalScope, s.pageEvaluate, [wrappedEvalLines]);
+        return _evalCore(_state.evalScope, _state.pageEvaluate, wrappedEvalLines);
     }
 
     function _rewriteAsDynamicImports(imports: ImportDeclaration[]) 
@@ -91,10 +91,11 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         return variableNames.flat();
     }
 
-    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlocks: string[]) {
+    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlock: string) {
+        let result;
         try {
             await pageEvaluate(`window.PW_executing = true`);
-            await evalScope(codeBlocks.join(''));
+            result = await evalScope(codeBlock);
             await pageEvaluate(`PW_reportError()`);
         } catch (error) {
             if (error instanceof Error) {
@@ -107,6 +108,7 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         } finally {
             await pageEvaluate(`window.PW_executing = false; window.reload_page_object_model_elements();`);
         }
+        return result;
     }
 
     export function _extractImports(filename: string) {
