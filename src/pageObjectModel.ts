@@ -1,45 +1,45 @@
 import _ from "lodash";
 import fs from "fs/promises";
+import process from "node:process";
 import nodePath from "node:path";
-import ts from "typescript";
 import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 import AsyncLock from "async-lock";
-import { ModuleKind, Project } from "ts-morph";
-
-
-export interface PageObjectEntry {
-    name: string;
-    deps: string[];
-    content: string;
-    isLoaded: boolean;
-}
+import { ModuleKind, Project, SyntaxKind } from "ts-morph";
 
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
     export let _state: {
         testFileDir: string,
         config: PlaywrightLiveRecorderConfig_pageObjectModel,
+        evalScope: (s: string) => Promise<any>,
         page: Page,
     } = <any>{};
-    const TrackedPaths: Set<string> = new Set<string>();
-    const TrackedPageObjects: { [name: string]: PageObjectEntry } = {};
+    let currentPageFilePath!: string;
+    let currentPageFilePathWatcher!: chokidar.FSWatcher;
     
     const lock = new AsyncLock();
-    export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, page: Page) {
-        _state = {testFileDir, config, page};
-        await page.exposeFunction('PW_urlToFilePath', (url: string) => config.urlToFilePath(url, config.aliases));
-        await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(_state.config.path, pathFromRoot), _state.testFileDir));
+    export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, evalScope: (s: string) => any, page: Page) {
+        _state = {testFileDir, config, evalScope, page};
+
+        await page.exposeFunction('PW_urlToFilePath', async (url: string) => {
+            const newfilePath = config.urlToFilePath(url, config.aliases);
+            if (newfilePath === currentPageFilePath) return currentPageFilePath;
+            currentPageFilePath = newfilePath;
+
+            await currentPageFilePathWatcher?.close();
+            currentPageFilePathWatcher = chokidar.watch(currentPageFilePath, { cwd: config.path })
+                .on(   'add', /*path*/() => reload(page))
+                .on('change', /*path*/() => reload(page));
+    
+            return currentPageFilePath;
+        });
+
+        await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(process.cwd(), _state.config.path, pathFromRoot), _state.testFileDir));
         
         await page.exposeFunction('PW_ensurePageObjectModelCreated', (path: string) => _ensurePageObjectModelCreated(fullRelativePath(path, config), classNameFromPath(path), config));
         await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock, config));
-
-        const watch = chokidar.watch(`${config.filenameConvention}`, { cwd: config.path });
-        
-        //note: watch.getWatched is empty so we can't init all here, instead the individual page reload process gets hit for each file on startup, which ensures everything is loaded
-        watch.on('add', path => reload(path, config.path, page));
-        watch.on('change', path => reload(path, config.path, page));
     }
 
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
@@ -49,77 +49,58 @@ export module pageObjectModel {
         return `import { ${className} } from '${importPath}';`
     }
 
-    export async function reload(path: string, config_pageObjectModel_path: string, page: Page) {
+    export async function reload(page: Page) {
         await lock.acquire('reload', async (release) => {
-            TrackedPaths.add(path);
-            const pageModel = await _reload(path, config_pageObjectModel_path);
-            TrackedPageObjects[pageModel.name] = pageModel;
-            await _attemptLoadPageObjectModel(pageModel, page);
+            try {
+                const f = nodePath.parse(currentPageFilePath);
+                const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
+                
+                //use ts-morph to parse helper methods including args
+                const project = new Project({ tsConfigFilePath: 'tsconfig.json' });
+                const sourceFile = project.addSourceFileAtPath(absolutePath);
+
+                const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
+                if (exportedClass === undefined) return;
+
+                const staticProperties = exportedClass?.getStaticProperties();
+                const staticMethods = exportedClass?.getStaticMethods();
+                
+                //use dynamic import to evaluate selector property values
+                const importPath = absolutePath.replaceAll('\\', '/'); // absolute path with extension
+                const importResult = (await _state.evalScope(`(async function() {
+                    try {
+                      const temporaryEvalResult = await import('${importPath}');
+                      return temporaryEvalResult;
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  })()`));
+                const classInstance = Object.entries(<any>importResult)[0][1] as Function;
+                
+                const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
+                
+                const selectorProperties = staticProperties.filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
+                    .map(prop => {
+                        const name = prop.getName();
+                        const selector = selectorPropertyValues[name];
+                        const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
+                        const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
+                        const selectorMethod = selectorMethodNode ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() } : { name: selectorMethodName, args: [], body: ''};
+                        return { name, selector: selector, selectorMethod };
+                    });
+                const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
+                    .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
+
+                const evalString = `window.PW_pages[\`${currentPageFilePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}}`;
+                await page.evaluate(evalString);
+            } catch (e) {
+                console.error(`error calling page.addScriptTag for page object model ${currentPageFilePath}`);
+                console.error(e);
+            }
+    
             await page.evaluate('reload_page_object_model_elements()');
             release();
         });
-    }
-
-    export async function _attemptLoadPageObjectModel(entry: PageObjectEntry, page: Page) {
-        if (entry.deps.some(dep => TrackedPageObjects[dep]?.isLoaded !== true))
-            return; //not all dependencies are loaded, don't load the script yet, it'll get automatically loaded when the last thing it's dependent upon is loaded
-
-        try {
-            await page.addScriptTag({ content: entry.content });
-            entry.isLoaded = true; //it loaded successfully, mark it as loaded
-
-            //attempt reload of any TrackedPageObjects dependent upon it
-            for (const otherEntry of _.filter(TrackedPageObjects, (otherEntry) => otherEntry.name !== entry.name && otherEntry.deps.includes(entry.name)))
-                await _attemptLoadPageObjectModel(otherEntry, page);
-        } catch (e) {
-            console.error(`error calling page.addScriptTag for page object model ${entry.name}`);
-        }
-    }
-
-    export async function _reload(path: string, config_pageObjectModel_path: string) {
-        const fileContents = await fs.readFile(`${config_pageObjectModel_path}${path}`, { encoding: 'utf8' });
-        const className = /\\?([^\\]+?)\.ts/.exec(path)![1]; //extract filename without extension as module name
-
-        const pageEntry = _transpile(path.replaceAll('\\', '/'), className, fileContents);
-        return pageEntry;
-    }
-
-    export async function _transpile2(normalizedFilePath: string, className: string): Promise<{ [name: string]: PageObjectEntry }> {
-        const tsProject = new Project({compilerOptions: { strict: false, module: ModuleKind.ESNext}});
-        tsProject.addSourceFileAtPath(nodePath.join(_state.config.path, normalizedFilePath));
-        const emitResult = tsProject.emitToMemory();
-        //emit result contains entire graph of local files to load
-        const fileEntries = emitResult.getFiles().map(x => ({ path: nodePath.relative(_state.config.path, x.filePath), content: x.text }));
-        const newPageObjectEntries: { [name: string]: PageObjectEntry } = {};
-        for (const entry of fileEntries) {
-            newPageObjectEntries[entry.path] = { name: entry.path, content: entry.content, deps: [], isLoaded: true };
-        }
-        return newPageObjectEntries;
-    }
-
-    export function _transpile(normalizedFilePath: string, className: string, fileContents: string): PageObjectEntry {
-        const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } } ).outputText;
-        const deps = _getDeps(transpiled);
-        const content = _cleanUpTranspiledSource(normalizedFilePath, className, transpiled);
-        return { name: className, deps, content, isLoaded: false };
-    }
-
-    export function _getDeps(transpiled: string) {
-        //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
-        const deps = [...transpiled.matchAll(/\bimport\b\s*{?(\s*[^};]+)}?\s*from\s*([^;]*);?/g)].map(i => i[1].split(',').map(i => i.trim())).flat(); //fetch the variable names
-        return deps;
-    }
-
-    export function _cleanUpTranspiledSource(normalizedFilePath: string, className: string, transpiled: string) {
-        //todo: replace hardcoded string replacements with using typescript lib to walk to AST instead
-        const exportReplacementText = `window.PW_pages['${normalizedFilePath}'] = {className: '${className}', page: ${className} };`;
-        const content = transpiled
-            //.replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, 'const $1 = require($2);') //convert 'import' to 'require' statements
-            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
-            .replace(`var ${className} = /** @class */ (function () {\r\n    function ${className}() {\r\n    }`, `var ${className} = {};`) //export class fixup
-            .replace(`    return ${className};\r\n}());\r\nexport { ${className} };`, exportReplacementText)                                //export class fixup
-            .replace(`export var ${className};`, exportReplacementText) //export module fixup
-        return content;
     }
 
     async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string, config: { generateClassTemplate: (className: string) => string}) {
@@ -147,22 +128,10 @@ export module pageObjectModel {
     }
     
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
-    function fullRelativePath(path: string, config: { path: string }) { return path.normalize(nodePath.join(config.path, path)); }
-
-    export function hotReloadedPageObjectModelSrc() {
-        var str = '';
-        for (const entryName in TrackedPageObjects) {
-            const pageEntry = TrackedPageObjects[entryName];
-            
-            str += pageEntry.content.replace(/\nwindow.PW_pages\[.*/, '') + '\n\n';
-        }
-
-        return str;
-    }
+    function fullRelativePath(path: string, config: { path: string }) { return nodePath.normalize(nodePath.join(config.path, path)); }
 
     export async function reloadAll(configPath: string, page: Page) {
-        for (const path in TrackedPaths) {
-            await pageObjectModel.reload(path, configPath, page);
-        }
+        if (!currentPageFilePath) return;
+        await reload(page);
     }
 }
