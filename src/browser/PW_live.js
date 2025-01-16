@@ -5,27 +5,28 @@ window.PW_statusbar = document.createElement("div");
 PW_statusbar.classList.add("PW");
 
 PW_statusbar.innerHTML = `
-    <div class="PW-statusbar">
-        <input id="PW-repl" spellcheck="false" style="width:100%" disabled="true" placeholder="Playwright Live Recorder" title="Last executed line (modify and press enter to re-evaluate)">
-        <input id="PW-page-object-model-filename" class="PW-statusbar-item" disabled="true" title="page object model filename">
-        <span class="PW-checkbox-recording PW-statusbar-item" title="Playwright Live Recorder">
-            <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
-            <label for="PW-record-checkbox" style="margin:8px"/>
-        </span>
+<div style="text-align:center;">
+  <div id="PW-statusbar" class="PW-statusbar" style="margin: 0 auto; border-radius:0px 0px 4px 4px; padding: 0px 3px; display:inline-block; width: auto">
+    <div style="display: flex">
+      <span id="PW-drag-element" style="color:lightgray; cursor:grab; user-select:none; font-size:18px;">⦙⦙</span>
+      <span class="input" role="textbox" id="PW-page-object-model-filename" style="border-radius: 2px; min-width: 19ch; display:flex; padding: 3px 2px 2px 2px">Playwright Live Recorder</span>
+      <span class="PW-checkbox-recording PW-statusbar-item" title="Ctrl+Alt+Shift R" style="margin:-6px -4px -6px -4px; display:flex; align-items: center; justify-content: center;">
+          <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
+          <label for="PW-record-checkbox" style="margin:8px"/>
+      </span>
     </div>
-    <div id="PW-eval-error">
-        <details>
-            <summary id="PW-eval-error-summary" style="visibility:collapsed">
-            </summary>
-            <div id = "PW-eval-error-details"></div>
-        </details>
-    </div>
+  </div>
+</div>
+<div id="PW-eval-error">
+    <details>
+        <summary id="PW-eval-error-summary" style="visibility:collapsed">
+        </summary>
+        <div id = "PW-eval-error-details"></div>
+    </details>
+</div>
 `;
 
 document.body.prepend(PW_statusbar);
-
-window.PW_repl = document.getElementById("PW-repl");
-PW_repl.addEventListener("keyup", (event) => ((event.code || event.key) === "Enter" ? PW_updateAndRerunLastCommand(PW_repl.value) : {}));
 
 window.PW_eval_error = document.getElementById("PW-eval-error");
 PW_eval_error.style.display = "none";
@@ -33,6 +34,41 @@ window.PW_eval_error_summary = document.getElementById("PW-eval-error-summary");
 window.PW_eval_error_details = document.getElementById("PW-eval-error-details");
 
 window.PW_page_object_model_filename = document.getElementById("PW-page-object-model-filename");
+
+
+var PLR_dragElement = document.getElementById('PW-drag-element');
+var PLR_statusBar = document.getElementById('PW-statusbar');
+
+var _pw_drag_startX, _pw_drag_startY, pw_drag_initialTransformX;
+
+PLR_dragElement.addEventListener('mousedown', (event) => {
+  const tx  = PLR_statusBar.style.transform;
+  pw_drag_initialTransformX = parseInt(tx.substring(tx.indexOf('(') + 1, tx.indexOf('px')), 10);
+  if (isNaN(pw_drag_initialTransformX)) pw_drag_initialTransformX = 0;
+  
+  _pw_drag_startX = event.clientX;
+  _pw_drag_startY = event.clientY;
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+
+  PLR_dragElement.style.cursor = 'grabbing';
+});
+
+function onMouseMove(event) {
+  console.log('mouseMove');
+  const currentX = event.clientX;
+  const deltaX = currentX - _pw_drag_startX;
+  PLR_statusBar.style.transform = `translateX(${deltaX + pw_drag_initialTransformX}px)`;
+}
+
+function onMouseUp() {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup', onMouseUp);
+
+  PLR_dragElement.style.cursor = 'grab';
+}
+
 
 if (window.PW_tooltip) PW_tooltip.remove();
 var PW_tooltip = document.createElement("div");
@@ -138,7 +174,7 @@ function mousemove_updateTooltip(event) {
   }
 }
 
-async function recordModeClickHandler(event) {
+async function recordModeClickHandler_swallowClick(event) {
   if (!recordModeOn) return;
   if (window.PW_executing) return;
 
@@ -148,7 +184,13 @@ async function recordModeClickHandler(event) {
 
   event.preventDefault();
   event.stopImmediatePropagation();
+  return element;
+}
 
+async function recordModeClickHandler(event) {
+  const element = await recordModeClickHandler_swallowClick(event);
+  if (element == null) return;
+  
   let newItemName;
   const selectorConvention = document.PW_getSelectorConventionForElement(element);
   if (config.pageObjectModel.enabled && !selectorConvention.isPageObjectModel) {
@@ -156,6 +198,9 @@ async function recordModeClickHandler(event) {
     if (newItemName != null) {
       const selector = selectorConvention.match(element);
       await PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
+    } else {
+      const selector = selectorConvention.match(element);
+      navigator.clipboard.writeText(selector);
     }
     return;
   }
@@ -164,8 +209,6 @@ async function recordModeClickHandler(event) {
   const primaryAction = element.closest('[data-page-object-model-primary-action]').getAttribute("data-page-object-model-primary-action");
   //todo - implement secondary actions
   const replLine = primaryAction.replaceAll('$1', resultOutput);
-  PW_repl.value = replLine;
-  PW_repl.disabled = false;
 
   if (selectorConvention.isPageObjectModel) {
     await PW_appendToTest(replLine, element.closest('[data-page-object-model-import]').getAttribute("data-page-object-model-import"));
@@ -181,6 +224,11 @@ document.PW_getSelectorConventionForElement = function (el) {
 window.addEventListener("keydown", keyChord_toggleRecordMode);
 window.addEventListener("mousemove", mousemove_updateTooltip);
 window.addEventListener("click", recordModeClickHandler, true);
+//todo - figure out how to capture click on disabled elements
+//var _PW_mousedown_element;
+//window.addEventListener('pointerdown', function (e) { _PW_mousedown_element = e.target; recordModeClickHandler_swallowClick(e);});//, true);
+//document.addEventListener('pointerup', function (e) { if (e.target === _PW_mousedown_element) recordModeClickHandler(e); });//, true);
+
 
 /******** page object model feature ********/
 
@@ -195,7 +243,7 @@ async function reload_page_object_model_elements() {
 
   //get current page object to reflect across
   pageObjectFilePath = await PW_urlToFilePath(window.location.href);
-  PW_page_object_model_filename.value = pageObjectFilePath;
+  PW_page_object_model_filename.innerText = pageObjectFilePath ?? "Playwright Live Recorder";
 
   if (!recordModeOn) return;
 

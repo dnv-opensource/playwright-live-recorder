@@ -119,6 +119,10 @@ export class ${className} {
      * @param evalScope pass value of `s => eval(s)`, this provides the test's execution scope so eval'd lines have local scope variables, relative import paths, etc
      */
     export async function start(page: Page, evalScope: (s: string) => any) {
+        if (evalScope.toString() !== 's => eval(s)'){
+            const testEval = evalScope('1+1');
+            if (testEval !== 2) throw new Error(`evalScope does not evaluate correctly, please verify, should look something like \`s => <unknown>eval(s)\`, instead got \`${evalScope.toString()}\``);
+        }
         const pageState = <pageState><any>page;
         if (pageState.PlaywrightLiveRecorder_started === true) {
             return;
