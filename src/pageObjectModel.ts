@@ -23,18 +23,7 @@ export module pageObjectModel {
     export async function init(testFileDir: string, config: PlaywrightLiveRecorderConfig_pageObjectModel, evalScope: (s: string) => any, page: Page) {
         _state = {testFileDir, config, evalScope, page};
 
-        await page.exposeFunction('PW_urlToFilePath', async (url: string) => {
-            const newfilePath = config.urlToFilePath(url, config.aliases);
-            if (newfilePath === currentPageFilePath) return currentPageFilePath;
-            currentPageFilePath = newfilePath;
-
-            await currentPageFilePathWatcher?.close();
-            currentPageFilePathWatcher = chokidar.watch(currentPageFilePath, { cwd: config.path })
-                .on(   'add', /*path*/() => reload(page))
-                .on('change', /*path*/() => reload(page));
-    
-            return currentPageFilePath;
-        });
+        await page.exposeFunction('PW_urlToFilePath', async (url: string) => PW_urlToFilePath(url));
 
         await page.exposeFunction('PW_importStatement', (className: string, pathFromRoot: string) => _importStatement(className, nodePath.join(process.cwd(), _state.config.path, pathFromRoot), _state.testFileDir));
         
@@ -42,6 +31,19 @@ export module pageObjectModel {
         await page.exposeFunction('PW_appendToPageObjectModel', (path: string, codeBlock: string) => _appendToPageObjectModel(fullRelativePath(path, config), classNameFromPath(path), codeBlock, config));
     }
 
+    export async function PW_urlToFilePath(url: string) {
+        const newfilePath = _state.config.urlToFilePath(url, _state.config.aliases);
+        if (newfilePath === currentPageFilePath) return currentPageFilePath;
+        currentPageFilePath = newfilePath;
+
+        await currentPageFilePathWatcher?.close();
+        const cwd = nodePath.join(process.cwd(), _state.config.path);
+        currentPageFilePathWatcher = chokidar.watch(currentPageFilePath, { cwd })
+            .on(   'add', /*path*/() => reload(_state.page))
+            .on('change', /*path*/() => reload(_state.page));
+
+        return currentPageFilePath;
+}
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
         const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
         let importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension

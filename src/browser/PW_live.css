@@ -2,7 +2,6 @@
     position: sticky;
     z-index: 2147483647;
     top: 0;
-    border-bottom: 1px solid black;
 }
 
 .PW-tooltip {
