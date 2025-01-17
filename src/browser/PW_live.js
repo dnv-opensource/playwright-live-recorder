@@ -31,11 +31,6 @@ PW_statusbar.innerHTML = `
 
 document.body.prepend(PW_statusbar);
 
-/* window.PW_eval_error = document.getElementById("PW-eval-error");
-PW_eval_error.style.display = "none";
-window.PW_eval_error_summary = document.getElementById("PW-eval-error-summary");
-window.PW_eval_error_details = document.getElementById("PW-eval-error-details");
- */
 window.PW_page_object_model_filename = document.getElementById("PW-page-object-model-filename");
 window.PLR_pom_methods_dropdown = document.getElementById("PLR_pom_methods_dropdown");
 
@@ -365,9 +360,9 @@ function setToastContent(img, desc) {
 var show_toast_timeout;
 function show_toast(timeoutMs) {
   var x = document.getElementById("PW_PLR_toast");
-  x.className = "show";
+  x.classList.add('show');
   if (show_toast_timeout) clearTimeout(show_toast_timeout);
-  show_toast_timeout = timeoutMs ? setTimeout(function(){ x.className = x.className.replace("show", ""); }, timeoutMs) : undefined;
+  show_toast_timeout = timeoutMs ? setTimeout(function(){ x.classList.remove('show'); }, timeoutMs) : undefined;
 }
 
 clearPageObjectModelElements();

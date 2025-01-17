@@ -134,10 +134,10 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         const newLines = newSrc.split(_NEWLINE);
 
         if (oldLines.length == 0) return newSrc;
-        const firstLineWithChange = newLines.find((s, index) => oldLines.length < index || oldLines[index] !== s);
-        if (firstLineWithChange == null) return '';
+        const firstLineWithChangeIndex = newLines.findIndex((s, index) => oldLines.length < index || oldLines[index] !== s);
+        if (firstLineWithChangeIndex == -1) return '';
 
-        const linesToExecute = newLines.slice(newLines.indexOf(firstLineWithChange));
+        const linesToExecute = newLines.slice(firstLineWithChangeIndex);
 
         const blockToExecute = linesToExecute.join('\n');
         return blockToExecute;
