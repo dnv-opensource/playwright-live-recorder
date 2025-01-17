@@ -6,40 +6,43 @@ PW_statusbar.classList.add("PW");
 
 PW_statusbar.innerHTML = `
 <div style="text-align:center;">
-  <div id="PW-statusbar" class="PW-statusbar" style="margin: 0 auto; border-radius:0px 0px 4px 4px; padding: 0px 3px; display:inline-block; width: auto">
-    <div style="display: flex">
-      <span id="PW-drag-element" style="color:lightgray; cursor:grab; user-select:none; font-size:18px;">⦙⦙</span>
-      <span class="input" role="textbox" id="PW-page-object-model-filename" style="border-radius: 2px; min-width: 19ch; display:flex; padding: 3px 2px 2px 2px">Playwright Live Recorder</span>
-      <span class="PW-checkbox-recording PW-statusbar-item" title="Ctrl+Alt+Shift R" style="margin:-6px -4px -6px -4px; display:flex; align-items: center; justify-content: center;">
-          <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
-          <label for="PW-record-checkbox" style="margin:8px"/>
+  <div id="PW-statusbar" class="PW-statusbar" style="margin: 0px auto; border-radius: 0px 0px 4px 4px; padding: 0; display: inline-block; background: white; overflow:none;opacity:0.95;">
+    <div style="display:flex;min-width:15ch;justify-content:space-around; margin: 0; border-bottom: 1px solid #ccc">
+      <span id="PW-drag-element" style="user-select:none; font-size:24px; margin:4px -4px -4px -4px; height:30px; cursor:grab;">⋮⋮</span>
+      
+      <div class="dropdown__category">
+        <li style="margin:2px 4px; user-select:none; cursor:pointer;"><span title="static helper methods from page object model file"><span style="font-size:24px;margin:-2px">ƒ</span><span style="font-size:16px;margin:-2px">𝓍</span></span>
+          <ul id="PLR_pom_methods_dropdown" class="dropdown__menu" style="text-align:left;">
+          </ul>
+        </li>
+      </div>
+
+      <span class="PW-checkbox-recording PW-statusbar-item" title="Toggle Record\nCtrl+Alt+Shift R" style="margin:-4px -4px -8px -4px; display:flex; align-items:center;">
+        <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
+        <label for="PW-record-checkbox"></label>
       </span>
     </div>
+  <span class="input" role="textbox" id="PW-page-object-model-filename" style="color:gray;font-size:10px;">Playwright Live Recorder</span>
   </div>
-</div>
-<div id="PW-eval-error">
-    <details>
-        <summary id="PW-eval-error-summary" style="visibility:collapsed">
-        </summary>
-        <div id = "PW-eval-error-details"></div>
-    </details>
+
+  <div id="PW_PLR_toast"><div id="PW_PLR_toast_img">icon</div><div id="PW_PLR_toast_desc">message...</div></div>
 </div>
 `;
 
 document.body.prepend(PW_statusbar);
 
-window.PW_eval_error = document.getElementById("PW-eval-error");
+/* window.PW_eval_error = document.getElementById("PW-eval-error");
 PW_eval_error.style.display = "none";
 window.PW_eval_error_summary = document.getElementById("PW-eval-error-summary");
 window.PW_eval_error_details = document.getElementById("PW-eval-error-details");
-
+ */
 window.PW_page_object_model_filename = document.getElementById("PW-page-object-model-filename");
-
+window.PLR_pom_methods_dropdown = document.getElementById("PLR_pom_methods_dropdown");
 
 var PLR_dragElement = document.getElementById('PW-drag-element');
 var PLR_statusBar = document.getElementById('PW-statusbar');
 
-var _pw_drag_startX, _pw_drag_startY, pw_drag_initialTransformX;
+var _pw_drag_startX, pw_drag_initialTransformX;
 
 PLR_dragElement.addEventListener('mousedown', (event) => {
   const tx  = PLR_statusBar.style.transform;
@@ -47,7 +50,6 @@ PLR_dragElement.addEventListener('mousedown', (event) => {
   if (isNaN(pw_drag_initialTransformX)) pw_drag_initialTransformX = 0;
   
   _pw_drag_startX = event.clientX;
-  _pw_drag_startY = event.clientY;
 
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
@@ -56,7 +58,6 @@ PLR_dragElement.addEventListener('mousedown', (event) => {
 });
 
 function onMouseMove(event) {
-  console.log('mouseMove');
   const currentX = event.clientX;
   const deltaX = currentX - _pw_drag_startX;
   PLR_statusBar.style.transform = `translateX(${deltaX + pw_drag_initialTransformX}px)`;
@@ -68,7 +69,6 @@ function onMouseUp() {
 
   PLR_dragElement.style.cursor = 'grab';
 }
-
 
 if (window.PW_tooltip) PW_tooltip.remove();
 var PW_tooltip = document.createElement("div");
@@ -89,7 +89,8 @@ PW_config().then((c) => {
   //functions serialize through as text, try to create them as functions once again
   config.pageObjectModel.overlay.on = eval(config.pageObjectModel.overlay.on);
   config.pageObjectModel.overlay.off = eval(config.pageObjectModel.overlay.off);
-  config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate); // note this is done browser side... consider if it should be evaluated in test context instead
+  config.pageObjectModel.generatePropertyTemplate = eval(config.pageObjectModel.generatePropertyTemplate);
+  config.pageObjectModel.generateMethodTemplate = eval(config.pageObjectModel.generateMethodTemplate);
 });
 
 function keyChord_toggleRecordMode(event) {
@@ -159,7 +160,7 @@ function mousemove_updateTooltip(event) {
 
     mouse_x = event.x;
     mouse_y = event.y;
-    window.PW_tooltip.style.visibility = !recordModeOn || element.closest(".PW") ? "hidden" : "visible";
+    window.PW_tooltip.style.visibility = !recordModeOn || element.closest(".PW")  ? "hidden" : "visible";
     if (!recordModeOn) return;
 
     updateTooltipPosition(mouse_x, mouse_y);
@@ -209,6 +210,8 @@ async function recordModeClickHandler(event) {
   const primaryAction = element.closest('[data-page-object-model-primary-action]').getAttribute("data-page-object-model-primary-action");
   //todo - implement secondary actions
   const replLine = primaryAction.replaceAll('$1', resultOutput);
+  //PW_repl.value = replLine;
+  //PW_repl.disabled = false;
 
   if (selectorConvention.isPageObjectModel) {
     await PW_appendToTest(replLine, element.closest('[data-page-object-model-import]').getAttribute("data-page-object-model-import"));
@@ -224,7 +227,6 @@ document.PW_getSelectorConventionForElement = function (el) {
 window.addEventListener("keydown", keyChord_toggleRecordMode);
 window.addEventListener("mousemove", mousemove_updateTooltip);
 window.addEventListener("click", recordModeClickHandler, true);
-//todo - figure out how to capture click on disabled elements
 //var _PW_mousedown_element;
 //window.addEventListener('pointerdown', function (e) { _PW_mousedown_element = e.target; recordModeClickHandler_swallowClick(e);});//, true);
 //document.addEventListener('pointerup', function (e) { if (e.target === _PW_mousedown_element) recordModeClickHandler(e); });//, true);
@@ -240,48 +242,76 @@ var pageObjectFilePath = "";
 
 async function reload_page_object_model_elements() {
   clearPageObjectModelElements();
-
+  if (PW_urlToFilePath === undefined) return; //test backend hasn't injected functions yet
   //get current page object to reflect across
   pageObjectFilePath = await PW_urlToFilePath(window.location.href);
   PW_page_object_model_filename.innerText = pageObjectFilePath ?? "Playwright Live Recorder";
-
-  if (!recordModeOn) return;
 
   const pageObject = window.PW_pages[pageObjectFilePath];
   if (pageObject === undefined) return;
 
   const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
-  for (var prop of pageObject.selectors) {
-    try {
-      const matchingElements = playwright.locator(prop.selector).elements;
-      if (matchingElements.length > 1) {
-        //todo: show a warning somehow
-      }
-      if (matchingElements.length === 0) {
-        console.info(`could not find element for selector ${prop.selector}. skipping.`);
-        continue;
-      }
+  if (recordModeOn){
+    for (var prop of pageObject.selectors) {
+      try {
+        const matchingElements = playwright.locator(prop.selector).elements;
+        if (matchingElements.length > 1) {
+          //todo: show a warning somehow
+        }
+        if (matchingElements.length === 0) {
+          console.info(`could not find element for selector ${prop.selector}. skipping.`);
+          continue;
+        }
 
-      const primaryAction = config.pageObjectModel.primaryActionByCssSelector.find(([css]) => matchingElements[0].matches(css))[1];
-      const secondaryActions = config.pageObjectModel.secondaryActionByCssSelector.filter(([css]) => matchingElements[0].matches(css)).map(([, action]) => action);
-      const dataPageObjectModel = `${pageObject.className}.${prop.selectorMethod.name}(${prop.selectorMethod.args.join(', ')})`;
-      for (const el of matchingElements) {
-        el.setAttribute("data-page-object-model", dataPageObjectModel);
-        el.setAttribute("data-page-object-model-import", pageObjectModelImportStatement);
-        
-        el.setAttribute("data-page-object-model-primary-action", primaryAction);
-        el.setAttribute("data-page-object-model-secondary-actions", encodeURIComponent(JSON.stringify(secondaryActions)));
-        config.pageObjectModel.overlay.on(el, config.pageObjectModel.overlay.color);
-        PW_overlays.push(el);
+        const primaryAction = config.pageObjectModel.primaryActionByCssSelector.find(([css]) => matchingElements[0].matches(css))[1];
+        const secondaryActions = config.pageObjectModel.secondaryActionByCssSelector.filter(([css]) => matchingElements[0].matches(css)).map(([, action]) => action);
+        const dataPageObjectModel = `${pageObject.className}.${prop.selectorMethod.name}(${prop.selectorMethod.args.join(', ')})`;
+        for (const el of matchingElements) {
+          el.setAttribute("data-page-object-model", dataPageObjectModel);
+          el.setAttribute("data-page-object-model-import", pageObjectModelImportStatement);
+          
+          el.setAttribute("data-page-object-model-primary-action", primaryAction);
+          el.setAttribute("data-page-object-model-secondary-actions", encodeURIComponent(JSON.stringify(secondaryActions)));
+          config.pageObjectModel.overlay.on(el, config.pageObjectModel.overlay.color);
+          PW_overlays.push(el);
+        }
+      } catch (err) {
+        console.log(err);
       }
-    } catch (err) {
-      console.log(err);
     }
+  }  
+  
+  window.PLR_pom_methods_dropdown.innerHTML = "";
+  for (var meth of pageObject.methods) {
+    // {name: string, args: string[], body: method.getText() }
+
+    const isAsync = meth.body.includes("async");
+    const codeLine = `${isAsync ? 'await ':''}${pageObject.className}.${meth.name}(${meth.args.join(', ')});`
+    const el = document.createElement("li");
+    el.onclick = () => PW_appendToTest(codeLine, pageObjectModelImportStatement);
+    el.innerText = `${meth.name}(${meth.args.join(', ')})`;
+
+    window.PLR_pom_methods_dropdown.appendChild(el);
   }
+
+  {
+    const addFunctionEl = document.createElement("li");
+    addFunctionEl.innerText = "+";
+    addFunctionEl.style = "background:green;color:white;font-size:14px;text-align:center";
+
+    addFunctionEl.onclick = () => {
+      const newFunctionName = window.prompt("New function name?");
+      if (newFunctionName == null) return;
+      PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generateMethodTemplate(newFunctionName));
+    };
+    window.PLR_pom_methods_dropdown.appendChild(addFunctionEl);
+  }
+  
 }
 
 function clearPageObjectModelElements() {
   if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
+
   //clean up any rogue elements
   const pageObjectModelAttributes = ['data-page-object-model', 'data-page-object-model-import', 'data-page-object-model-primary-action', 'data-page-object-model-secondary-actions'];
   document.querySelectorAll(pageObjectModelAttributes.join(', ')).forEach(el => {
@@ -289,17 +319,6 @@ function clearPageObjectModelElements() {
     config.pageObjectModel.overlay.off(el)
   });
   window.PW_overlays = [];
-}
-
-function PW_reportError(summary, errorStack, doNotWrapDetails) {
-  if (summary === undefined && errorStack === undefined) {
-    PW_eval_error.style.display = "none";
-    return;
-  }
-  if (errorStack != null && !doNotWrapDetails) errorStack = errorStack.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-  PW_eval_error.style.display = "block";
-  PW_eval_error_summary.innerHTML = summary;
-  PW_eval_error_details.innerHTML = doNotWrapDetails ? errorStack : `<pre class="PW-pre">${errorStack}</pre>`;
 }
 
 //pageObject selector evaluation requires `playwright` object, warn user if it's not available
@@ -315,3 +334,41 @@ or if using vscode ms-playwright.playwright extension, add the following into <a
     true
   );
 }
+
+PW_executionBlocks = [];
+function PW_callback_begin_executing(i, code, fullCodeBlock) {
+  PW_executing = true;
+  PW_executionBlocks.push({i, code, fullCodeBlock, isExecuting: true });
+
+  setToastContent('<div class="PW_PLR_loader"></div>', `<pre class="PW-pre">${code}</pre>`);
+  show_toast();
+}
+
+function PW_callback_finished_executing(i, success, result, code, fullCodeBlock) {
+  window.PW_executing = false;
+  const executionBlockIndex = PW_executionBlocks.findIndex(x => x.i == i);
+  const executionBlockResult = {i, code, fullCodeBlock, isExecuting: false, success, result };
+  if (executionBlockIndex == -1) PW_executionBlocks.push(executionBlockResult);
+  PW_executionBlocks[executionBlockIndex] = {...PW_executionBlocks[executionBlockIndex], ...executionBlockResult};
+
+  console.log(`${success ? '✅' : '❌'}\n${code}\n\n${result == undefined ? '' : JSON.stringify(result, undefined, '  ')}`);
+  setToastContent(success ? '<span>✅</span>' : '<span>❌</span>', `<pre class="PW-pre">${code}</pre><pre class="PW-pre">${result == undefined ? '' : encodeURIComponent(JSON.stringify(result, undefined, '  '))}</pre>`);
+  show_toast(success && result == undefined ? 2_000 : undefined);
+  reload_page_object_model_elements();
+}
+
+function setToastContent(img, desc) {
+  document.getElementById("PW_PLR_toast_img").innerHTML = img;
+  document.getElementById("PW_PLR_toast_desc").innerHTML = desc;
+}
+
+var show_toast_timeout;
+function show_toast(timeoutMs) {
+  var x = document.getElementById("PW_PLR_toast");
+  x.className = "show";
+  if (show_toast_timeout) clearTimeout(show_toast_timeout);
+  show_toast_timeout = timeoutMs ? setTimeout(function(){ x.className = x.className.replace("show", ""); }, timeoutMs) : undefined;
+}
+
+clearPageObjectModelElements();
+setTimeout(() => reload_page_object_model_elements(), 1000);

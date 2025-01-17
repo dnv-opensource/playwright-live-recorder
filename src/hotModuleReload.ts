@@ -42,10 +42,10 @@ export module hotModuleReload {
                 s.imports = _extractImports(s.t.file);        
                 const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.testLineNumber, s.t.executingLine)) ?? '';
                 const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
+                s.testFnContents = newTestFnContents;
                 if (blockToExecute === '')
                     return;
                 await evalLines(blockToExecute);
-                s.testFnContents = newTestFnContents;
             } finally {
                 release();
             }
@@ -55,7 +55,7 @@ export module hotModuleReload {
     async function evalLines(lines: string) {
         const importsBlock = _rewriteAsDynamicImports(_state.imports).join('\n');
         const wrappedEvalLines = _wrapAsyncAsPromise(importsBlock + '\n\n' + lines, _extractVariableListFrom(lines));
-        return _evalCore(_state.evalScope, _state.pageEvaluate, wrappedEvalLines);
+        return _evalCore(_state.evalScope, _state.pageEvaluate, wrappedEvalLines, lines);
     }
 
     function _rewriteAsDynamicImports(imports: ImportDeclaration[]) 
@@ -91,22 +91,23 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         return variableNames.flat();
     }
 
-    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlock: string) {
+    let _evalCoreCount = 1;
+    export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlock: string, codeBlockDescription: string) {
+        const i = _evalCoreCount++;
+        
         let result;
         try {
-            await pageEvaluate(`window.PW_executing = true`);
+            await pageEvaluate(`PW_callback_begin_executing(${i}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
             result = await evalScope(codeBlock);
-            await pageEvaluate(`PW_reportError()`);
+            await pageEvaluate(`PW_callback_finished_executing(${i}, true, ${JSON.stringify(result)}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
         } catch (error) {
             if (error instanceof Error) {
-                await pageEvaluate(`PW_reportError(\`${error.message}\`, \`${error.stack}\`)`);
+                await pageEvaluate(`PW_callback_finished_executing(${i}, false, ${error.message}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
                 console.warn(error);
             } else {
-                await pageEvaluate(`PW_reportError(\`Unexpected error during eval - See DEBUG CONSOLE in test execution environment for details\`, \`${JSON.stringify(error)}\`)`);
+                await pageEvaluate(`PW_callback_finished_executing(${i}, false, \`${JSON.stringify(error)}\`, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
                 console.error(error);
             }
-        } finally {
-            await pageEvaluate(`window.PW_executing = false; window.reload_page_object_model_elements();`);
         }
         return result;
     }

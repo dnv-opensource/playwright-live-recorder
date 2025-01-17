@@ -1,4 +1,9 @@
-### Update v2.0.48
+### v2.0.52
+* UI rework
+* Now aware of Page Object Model helper methods
+* Display currently executing lines of code in repl on-screen (still needs work)
+
+### v2.0.48
 * Live code execution method much simplified and much more robust (todo: write tech doc about this)
 
 ### Next
