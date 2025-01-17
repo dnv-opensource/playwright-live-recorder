@@ -63,9 +63,12 @@ export class ${className} {
             generatePropertyTemplate: (name: string, selector: string) =>
                 `    private static ${name}_selector = \`${selector}\`;\r\n` +
                 `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
+            generateMethodTemplate: (name: string) =>
+                `    static async ${name}(page: Page) {\r\n        \r\n    }\r\n\r\n`,
             overlay: {
                 color: 'salmon',
                 on: (el: HTMLElement, color: string) => {
+                    if (el.getAttribute('data-background')) return;
                     el.setAttribute('data-background', el.style.background);
                     el.style.background = color ?? 'salmon';
                 },
@@ -144,7 +147,7 @@ export class ${className} {
         await testFileWriter.init(page, testCallingLocation);
 
         await hotModuleReload.init(testCallingLocation, config.pageObjectModel.importerCustomizationHooks, (str: string) => page.evaluate(str), evalScope);
-        await page.exposeFunction('PW_eval', (codeBlock: string) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlock));
+        await page.exposeFunction('PW_eval', (codeBlock: string) => hotModuleReload._evalCore(evalScope, s => page.evaluate(s), codeBlock, codeBlock));
 
         await recorder.init(config.recorder, page);
 
@@ -169,7 +172,10 @@ export class ${className} {
 
         if (config.diagnostic.hotReloadBrowserLibFiles) {
             const watch = chokidar.watch([config.diagnostic.browserCodeJSPath, config.diagnostic.browserCodeCSSPath]);
-            watch.on('change', async path => await page.addScriptTag({ path }));
+            watch.on('change', async path => {
+                if (path.endsWith('.css')) await page.addStyleTag({ path });
+                else await page.addScriptTag({ path });
+            });
         }
 
         await page.waitForEvent("close", { timeout: 1000 * 60 * 60 });

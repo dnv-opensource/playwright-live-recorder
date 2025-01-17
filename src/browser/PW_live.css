@@ -25,20 +25,28 @@
     height: 100%;
 }
 
+.PW_pom_methods_content_item {
+    background: #ff808080;
+    border-radius: 8px;
+    padding: 2px 4px;
+    margin: 4px 0;
+    cursor: pointer;
+}
+
 .PW-grid-first-cell {
     grid-row-start: 1;
     grid-column-start: 1;
 }
 
-.PW-statusbar {
+/* .PW-statusbar {
     background: #eee;
     display: flex;
 }
-
-.PW-statusbar-item {
+ */
+/* .PW-statusbar-item {
     display: flex;
 }
-
+ */
 /* checkbox red dot styling */
 .PW-checkbox-recording input[type=checkbox] {
     visibility: collapse;
@@ -55,12 +63,12 @@
     border-radius: 50%;
     cursor: pointer;
     position: relative;
-    background: #bbb;
+    background: black;
 }
 
 .PW-checkbox-recording input[type=checkbox]:checked+label {
     background: #d00;
-    box-shadow: 0 0 5px #d00;
+    box-shadow: 0 0 2px #d00;
 }
 
 #PW-eval-error-details {
@@ -79,6 +87,98 @@
 }
 
 .PW-pre {
-    background: black;
+    background: #333;
     color: white;
+    margin: 0;
+    text-align: left;
+}
+
+.dropdown__category,
+.dropdown__menu {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+}
+
+.dropdown__category .dropdown__menu {
+  display: none;
+}
+
+.dropdown__category:hover .dropdown__menu {
+  display: block;
+}
+
+.dropdown__category .dropdown__menu {
+  position: absolute;
+  top: 30px;
+  left: 0;
+}
+
+.dropdown__category li {
+  padding: 0 4px;
+  position: relative;
+}
+
+.dropdown__menu li {
+  padding: 10px;
+  position: relative;
+  background: white;
+}
+
+.dropdown__category li:hover {
+  background: #ccc;
+}
+
+
+
+/* Toast */
+
+#PW_PLR_toast {
+    visibility: hidden;
+    display: flex;
+    width: 100%;
+    opacity: 0.95;
+    border-radius: 2px;
+
+    position: fixed;
+    z-index: 2147483647;
+    left: 0; right:0;
+    bottom: 30px;
+}
+#PW_PLR_toast #PW_PLR_toast_img {
+    box-sizing: border-box;
+    background-color: #333;
+    color: #fff;
+    font-size: 16px;
+}
+
+#PW_PLR_toast #PW_PLR_toast_desc {
+    background: #333;
+    color: #fff;
+    width: 100%;
+    font-size: 16px;
+}
+
+
+#toast.show {
+    visibility: visible;
+}
+
+
+
+/* loader */
+.PW_PLR_loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+0% { transform: rotate(0deg); }
+100% { transform: rotate(360deg); }
 }

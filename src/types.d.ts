@@ -65,6 +65,11 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     `    static ${name}(page: Page) { return page.locator(\`this.${name}_selector\`); }\r\n\r\n`,
     */
     generatePropertyTemplate: (name: string, selector: string) => string,
+    
+    /** @default  (name) => 
+    `    static async ${name}(page: Page) {\r\n        \r\n    }\r\n\r\n`,
+    */
+    generateMethodTemplate: (name: string) => string,
     overlay: {
         /** @default 'salmon' */
         color: string,
