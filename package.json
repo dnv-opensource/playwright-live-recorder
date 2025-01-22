@@ -7,14 +7,16 @@
   "files": [
     "dist/**/*.*"
   ],
+  "bin": {
+    "install": "./cli.js"
+  },
   "repository": "https://github.com/dnv-opensource/playwright-live-recorder",
   "author": "DNV",
   "license": "MIT",
   "private": false,
   "scripts": {
     "build": "tslint -p . && tsc && npx cpx \"src/**/*.{js,css,d.ts}\" dist && npx cpx \"example/**/*.*\" dist/example",
-    "test": "vitest",
-    "postinstall": "node -e \"if (process.env.INIT_CWD === process.cwd()) process.exit(); const fs = require('node:fs'); const dest = process.env.INIT_CWD; fs.readdirSync('dist/example').forEach(file => { try { fs.copyFileSync('dist/example/' + file, dest + '/' + file, fs.constants.COPYFILE_EXCL); } catch(e) { if (e.code !== 'EEXIST') throw e; } });\""
+    "test": "vitest"
   },
   "devDependencies": {
     "@playwright/test": "^1.0.0",

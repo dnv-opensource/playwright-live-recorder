@@ -99,13 +99,16 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         try {
             await pageEvaluate(`PW_callback_begin_executing(${i}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
             result = await evalScope(codeBlock);
-            await pageEvaluate(`PW_callback_finished_executing(${i}, true, ${JSON.stringify(result)}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
+            const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, true, ${JSON.stringify(result)}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`;
+            await pageEvaluate(evalString);
         } catch (error) {
             if (error instanceof Error) {
-                await pageEvaluate(`PW_callback_finished_executing(${i}, false, ${error.message}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
+                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, ${error.message}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`
+                await pageEvaluate(evalString);
                 console.warn(error);
             } else {
-                await pageEvaluate(`PW_callback_finished_executing(${i}, false, \`${JSON.stringify(error)}\`, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
+                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, \`${JSON.stringify(error)}\`, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`;
+                await pageEvaluate(evalString);
                 console.error(error);
             }
         }
@@ -134,10 +137,10 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         const newLines = newSrc.split(_NEWLINE);
 
         if (oldLines.length == 0) return newSrc;
-        const firstLineWithChange = newLines.find((s, index) => oldLines.length < index || oldLines[index] !== s);
-        if (firstLineWithChange == null) return '';
+        const firstLineWithChangeIndex = newLines.findIndex((s, index) => oldLines.length < index || oldLines[index] !== s);
+        if (firstLineWithChangeIndex == -1) return '';
 
-        const linesToExecute = newLines.slice(newLines.indexOf(firstLineWithChange));
+        const linesToExecute = newLines.slice(firstLineWithChangeIndex);
 
         const blockToExecute = linesToExecute.join('\n');
         return blockToExecute;
