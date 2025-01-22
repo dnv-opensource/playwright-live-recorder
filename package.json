@@ -5,7 +5,8 @@
   "description": "Adds live coding in testing context from browser console when running tests. Provides programmatically configurable recorder. Introduces the idea of strong convention for Page Object Model",
   "main": "dist/main.js",
   "files": [
-    "dist/**/*.*"
+    "dist/**/*.*",
+    "./cli.js"
   ],
   "bin": {
     "playwright-live-recorder": "./cli.js"
