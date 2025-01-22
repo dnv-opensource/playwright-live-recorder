@@ -1,61 +1,20 @@
-.PW {
-    position: sticky;
-    z-index: 2147483647;
-    top: 0;
-}
+.PW { position: fixed; z-index: 2147483647; top: 0; width: 100%; pointer-events: none; }
+.PW-statusbar { margin: 0px auto; border-radius: 0px 0px 4px 4px; border:1px #333 solid; padding:0; border-top:0; display: inline-block; background: white; opacity:0.9; pointer-events: auto; }
+.PW-statusbar > div { display:flex ;min-width:15ch; justify-content:space-around; margin: 0 0 -6px 0; border-bottom: 1px solid #ccc }
 
-.PW-tooltip {
-    position: fixed;
-    left: 0;
-    top: 0;
-    padding: 4px;
-    background: LavenderBlush;
-    outline: 1px solid black;
-    border-radius: 4px;
-    z-index: 2147483647;
-    visibility: hidden;
-}
+#PW-drag-element { user-select:none; font-size:24px; margin:-2px -4px -4px -4px; height:30px; cursor:grab; }
 
-.PW-page-object-model-overlay {
-    position: relative;
-    background-color: #ff8080;
-    opacity: 0.7;
-    z-index: 2147483646;
-    width: 100%;
-    height: 100%;
-}
+.PW-tooltip { position: fixed; left: 0; top: 0; padding: 4px; background: LavenderBlush; outline: 1px solid black; border-radius: 4px; z-index: 2147483647; visibility: hidden; }
+
+.PW-page-object-model-overlay { position: relative; background-color: #ff8080; opacity: 0.7; z-index: 2147483646; width: 100%; height: 100%; }
 
 /* checkbox red dot styling */
-.PW-checkbox-recording input[type=checkbox] {
-    visibility: collapse;
-    width: 0;
-    height: 0;
-}
+.PW-checkbox-recording { margin:0 -4px -8px -4px; display:flex; align-items:center; }
+.PW-checkbox-recording input[type=checkbox] { visibility: collapse; width: 0; height: 0; }
+.PW-checkbox-recording input[type=checkbox]:checked+label { background: #d00; box-shadow: 0 0 3px #f00; }
+.PW-checkbox-recording label { display: block; top: 0; left: 0; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; position: relative; background: #111; }
 
-.PW-checkbox-recording input[type=checkbox]:checked+label {
-    background: #d00;
-    box-shadow: 0 0 2px #d00;
-}
-
-.PW-checkbox-recording label {
-    display: block;
-    top: 0;
-    left: 0;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    cursor: pointer;
-    position: relative;
-    background: #111;
-}
-
-
-.PW-pre {
-    background: #333;
-    color: white;
-    margin: 0;
-    text-align: left;
-}
+.PW-pre { background: #333; color: white; margin: 0; text-align: left; }
 
 /* dropdown menu for methods */
 .dropdown__category,
@@ -63,7 +22,7 @@
 
 .dropdown__category .dropdown__menu { display: none; }
 .dropdown__category:hover .dropdown__menu { display: block; }
-.dropdown__category .dropdown__menu { position: absolute; top: 30px; left: 0; }
+.dropdown__category .dropdown__menu { position: absolute; top: 35px; left: 0; }
 .dropdown__category li { padding: 0 4px; position: relative; }
 .dropdown__menu li { padding: 10px; position: relative; background: white; }
 .dropdown__category li:hover { background: #ccc; }

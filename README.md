@@ -1,18 +1,19 @@
+### v2.0.53
+* Display currently executing lines of code in repl on-screen
+
 ### v2.0.52
 * UI rework
 * Now aware of Page Object Model helper methods
-* Display currently executing lines of code in repl on-screen (still needs work)
 
 ### v2.0.48
 * Live code execution method much simplified and much more robust (todo: write tech doc about this)
+* bugfix: Make page object model tools build correct paths on non-windows filesystems
 
 ### Next
-* bugfix: Make page object model tools build correct paths on non-windows filesystems
-* tech debt: Clean up messy/buggy code around parts not related to live code execution
-* tech debt: ui cleanup - remove executing line, make recording ui more similar to playwright codegen
-* feature: Add awareness of helper methods to PageObjectModel visualization (e.g. tabs at bottom of page)
-* feature: Add secondary commands via right-click to recorder
+
 * enhancement: Figure out how to make extensible selector code more user-friendly to edit and modify
+* feature: 
+* feature: Add secondary commands via right-click to recorder
 
 ----
 

@@ -56,9 +56,10 @@ export module pageObjectModel {
             try {
                 const f = nodePath.parse(currentPageFilePath);
                 const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
+                if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return;
                 
-                //use ts-morph to parse helper methods including args
-                const project = new Project({ tsConfigFilePath: 'tsconfig.json' });
+                const tsconfigFileExists = await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false);
+                const project = new Project({ tsConfigFilePath:  tsconfigFileExists ? 'tsconfig.json' : undefined });
                 const sourceFile = project.addSourceFileAtPath(absolutePath);
 
                 const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
@@ -93,15 +94,16 @@ export module pageObjectModel {
                 const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
                     .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
 
-                const evalString = `window.PW_pages[\`${currentPageFilePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}}`;
+                const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${currentPageFilePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}}`;
                 await page.evaluate(evalString);
+                await page.evaluate('if (reload_page_object_model_elements) reload_page_object_model_elements()');
             } catch (e) {
                 console.error(`error calling page.addScriptTag for page object model ${currentPageFilePath}`);
                 console.error(e);
+                await page.evaluate('if (reload_page_object_model_elements) reload_page_object_model_elements()');
+            } finally {
+                release();
             }
-    
-            await page.evaluate('reload_page_object_model_elements()');
-            release();
         });
     }
 

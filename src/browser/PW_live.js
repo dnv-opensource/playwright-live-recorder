@@ -6,18 +6,18 @@ PW_statusbar.classList.add("PW");
 
 PW_statusbar.innerHTML = `
 <div style="text-align:center;">
-  <div id="PW-statusbar" class="PW-statusbar" style="margin: 0px auto; border-radius: 0px 0px 4px 4px; padding: 0; display: inline-block; background: white; overflow:none;opacity:0.95;">
-    <div style="display:flex;min-width:15ch;justify-content:space-around; margin: 0; border-bottom: 1px solid #ccc">
-      <span id="PW-drag-element" style="user-select:none; font-size:24px; margin:4px -4px -4px -4px; height:30px; cursor:grab;">⋮⋮</span>
+  <div id="PW-statusbar" class="PW-statusbar">
+    <div>
+      <span id="PW-drag-element">⋮⋮</span>
       
       <div class="dropdown__category">
-        <li style="margin:2px 4px; user-select:none; cursor:pointer;"><span title="static helper methods from page object model file"><span style="font-size:24px;margin:-2px">ƒ</span><span style="font-size:16px;margin:-2px">𝓍</span></span>
+        <li style="margin:-4px 0 1px 0; user-select:none; cursor:pointer;"><span title="static helper methods from page object model file"><span style="font-size:24px;margin:-2px">ƒ</span><span style="font-size:16px;margin:-2px">𝓍</span></span>
           <ul id="PLR_pom_methods_dropdown" class="dropdown__menu" style="text-align:left;">
           </ul>
         </li>
       </div>
 
-      <span class="PW-checkbox-recording PW-statusbar-item" title="Toggle Record\nCtrl+Alt+Shift R" style="margin:-4px -4px -8px -4px; display:flex; align-items:center;">
+      <span class="PW-checkbox-recording" title="Toggle Record\nCtrl+Alt+Shift R">
         <input type="checkbox" id="PW-record-checkbox" onchange="toggleRecordMode(this.checked)">
         <label for="PW-record-checkbox"></label>
       </span>
@@ -196,7 +196,7 @@ async function recordModeClickHandler(event) {
       await PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
     } else {
       const selector = selectorConvention.match(element);
-      navigator.clipboard.writeText(selector);
+      navigator.clipboard.writeText(selector); //navigator.clipboard is undefined when running? troubleshoot me
     }
     return;
   }
@@ -243,6 +243,33 @@ async function reload_page_object_model_elements() {
   PW_page_object_model_filename.innerText = pageObjectFilePath ?? "Playwright Live Recorder";
 
   const pageObject = window.PW_pages[pageObjectFilePath];
+  
+  window.PLR_pom_methods_dropdown.innerHTML = "";
+  for (var meth of pageObject?.methods ?? []) {
+    // {name: string, args: string[], body: method.getText() }
+
+    const isAsync = meth.body.includes("async");
+    const codeLine = `${isAsync ? 'await ':''}${pageObject.className}.${meth.name}(${meth.args.join(', ')});`
+    const el = document.createElement("li");
+    el.onclick = () => PW_appendToTest(codeLine, pageObjectModelImportStatement);
+    el.innerText = `${meth.name}(${meth.args.join(', ')})`;
+
+    window.PLR_pom_methods_dropdown.appendChild(el);
+  }
+
+  {
+    const addFunctionEl = document.createElement("li");
+    addFunctionEl.innerText = "+";
+    addFunctionEl.style = "background:green;color:white;font-size:14px;text-align:center";
+
+    addFunctionEl.onclick = () => {
+      const newFunctionName = window.prompt("New function name?");
+      if (newFunctionName == null) return;
+      PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generateMethodTemplate(newFunctionName));
+    };
+    window.PLR_pom_methods_dropdown.appendChild(addFunctionEl);
+  }
+
   if (pageObject === undefined) return;
 
   const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
@@ -274,34 +301,7 @@ async function reload_page_object_model_elements() {
         console.log(err);
       }
     }
-  }  
-  
-  window.PLR_pom_methods_dropdown.innerHTML = "";
-  for (var meth of pageObject.methods) {
-    // {name: string, args: string[], body: method.getText() }
-
-    const isAsync = meth.body.includes("async");
-    const codeLine = `${isAsync ? 'await ':''}${pageObject.className}.${meth.name}(${meth.args.join(', ')});`
-    const el = document.createElement("li");
-    el.onclick = () => PW_appendToTest(codeLine, pageObjectModelImportStatement);
-    el.innerText = `${meth.name}(${meth.args.join(', ')})`;
-
-    window.PLR_pom_methods_dropdown.appendChild(el);
-  }
-
-  {
-    const addFunctionEl = document.createElement("li");
-    addFunctionEl.innerText = "+";
-    addFunctionEl.style = "background:green;color:white;font-size:14px;text-align:center";
-
-    addFunctionEl.onclick = () => {
-      const newFunctionName = window.prompt("New function name?");
-      if (newFunctionName == null) return;
-      PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generateMethodTemplate(newFunctionName));
-    };
-    window.PLR_pom_methods_dropdown.appendChild(addFunctionEl);
-  }
-  
+  }    
 }
 
 function clearPageObjectModelElements() {
@@ -341,10 +341,10 @@ function PW_callback_begin_executing(i, code, fullCodeBlock) {
 
 function PW_callback_finished_executing(i, success, result, code, fullCodeBlock) {
   window.PW_executing = false;
-  const executionBlockIndex = PW_executionBlocks.findIndex(x => x.i == i);
   const executionBlockResult = {i, code, fullCodeBlock, isExecuting: false, success, result };
+  let executionBlockIndex = PW_executionBlocks.findIndex(x => x.i == i);
   if (executionBlockIndex == -1) PW_executionBlocks.push(executionBlockResult);
-  PW_executionBlocks[executionBlockIndex] = {...PW_executionBlocks[executionBlockIndex], ...executionBlockResult};
+  else PW_executionBlocks[executionBlockIndex] = {...PW_executionBlocks[executionBlockIndex], ...executionBlockResult};
 
   console.log(`${success ? '✅' : '❌'}\n${code}\n\n${result == undefined ? '' : JSON.stringify(result, undefined, '  ')}`);
   setToastContent(success ? '<span>✅</span>' : '<span>❌</span>', `<pre class="PW-pre">${code}</pre><pre class="PW-pre">${result == undefined ? '' : encodeURIComponent(JSON.stringify(result, undefined, '  '))}</pre>`);
