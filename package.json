@@ -8,7 +8,7 @@
     "dist/**/*.*"
   ],
   "bin": {
-    "install": "./cli.js"
+    "playwright-live-recorder": "./cli.js"
   },
   "repository": "https://github.com/dnv-opensource/playwright-live-recorder",
   "author": "DNV",

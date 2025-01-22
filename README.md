@@ -1,3 +1,6 @@
+### v2.0.54
+* cli command fix
+
 ### v2.0.53
 * Display currently executing lines of code in repl on-screen
 * fix many issues after page navigation (tool only worked for SPAs previously)
@@ -14,7 +17,7 @@
 ### Next
 
 * enhancement: Figure out how to make extensible selector code more user-friendly to edit and modify
-* feature: 
+* feature: support nested page object model components
 * feature: Add secondary commands via right-click to recorder
 
 ----
