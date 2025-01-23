@@ -1,3 +1,6 @@
+### v2.0.57
+* updated readme, recorded demo video
+
 ### v2.0.56
 * cli command fix
 
@@ -14,12 +17,6 @@
 * Live code execution method much simplified and much more robust (todo: write tech doc about this)
 * bugfix: Make page object model tools build correct paths on non-windows filesystems
 
-### Next
-
-* enhancement: Figure out how to make extensible selector code more user-friendly to edit and modify
-* feature: support nested page object model components
-* feature: Add secondary commands via right-click to recorder
-
 ----
 
 
@@ -28,16 +25,12 @@
 
 # Getting Started
 
-## Watch the video
+## Watch the video demonstration
 
-
-[![Getting Started](https://i.ytimg.com/vi/73SnYrsrrTo/maxresdefault.jpg)](https://youtu.be/73SnYrsrrTo)
+[![Getting Started](https://i.ytimg.com/vi/ys5vczHm9sw/maxresdefault.jpg)](https://youtu.be/ys5vczHm9sw)
 
 
 -----
-## Details
------
-
 ## Prerequisites
 
 `@playwright/test` (typescript)
@@ -85,7 +78,7 @@ await PlaywrightLiveRecorder.start(page, s => <undefined>eval(s));
 
 Run the test in headed mode
 
-> 💡 if you're using the vscode plugin `ms-playwright.playwright` it will automatically run in headed mode with PWDEBUG set to console (see modifications to `.vscode/settings.json`)
+> 💡 if you're using the vscode plugin `ms-playwright.playwright` it will automatically run in headed mode with PWDEBUG set to console (see modifications to `.vscode/settings.json`)  
 > 💡 if you're running from the command line, set the environment variable `PWDEBUG=console` before running the playwright command, e.g. `playwright test --ui`
 
 Test will run, when `PlaywrightLiveRecorder.start` line is executed lib functionality will be exposed to the browser and all scripts will be loaded in the browser. Test execution waits until browser is closed.  
@@ -101,7 +94,7 @@ Newly added or modified test lines above `PlaywrightLiveRecorder.start` are exec
 > * The label is the page object model path+filename  
 > * the f(x) button displays public helper functions available from your page object model file, click the green ➕ to add an example to the file
 >
-> When record is toggled on a hover tooltip is positioned next to the cursor showing the code that will be generated 
+> When record is toggled on a hover tooltip is positioned next to the cursor showing the code that will be generated  
 >> 💡 if the recorder blocks your testing session, work past it by toggling record off, clicking, then toggling it back on
 
 ## **Recording**
