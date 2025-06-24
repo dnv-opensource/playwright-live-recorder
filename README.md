@@ -1,3 +1,6 @@
+### v2.0.59
+* added basic support for #16 `Support 'global' page object` and #3 `support nested page object models`
+
 ### v2.0.57
 * updated readme, recorded demo video
 
