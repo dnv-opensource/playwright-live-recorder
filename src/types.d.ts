@@ -27,6 +27,8 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     baseUrl: string|undefined,
     /** @default 5000 */
     actionTimeout: number,
+    /** @default 'global_page.ts' */
+    globalPageFilePath: string,
     /** @default (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
@@ -44,10 +46,11 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     /**
      * @remarks use to override/alias url fragments to page object model name
      * @example { '': 'home', 'login/corporate' : 'login', 'login/personal' : 'login' } //redirect from root address to 'home' pom. use same pom for login/corporate and login/personal
-    */
-    aliases: {[key: string]: string},
-    /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector/*/
+    */    aliases: {[key: string]: string},
+    /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector\b/*/
     propertySelectorRegex: RegExp,
+    /** @remarks Use this to find list of nested page objects within a given page object model file @default /(.+)_page\b/*/
+    propertyNestedPageRegex: RegExp,
     /** @remarks Use this to specify the text appended when LEFT clicked on in record mode @default [ ["input[type="text"]", 'fill()'], ["textarea", 'fill()'], ["/.*\/", "click()"] ] */
     primaryActionByCssSelector: [string, string][],
     /** @remarks Use this to specify the text appended when RIGHT clicked on in record mode @default [ ["input[type="text"]", "await expect($1.innerText()).toContain('')"], ["textarea", "innerText().toContain('')"], ["/.*\/", ""]]*/

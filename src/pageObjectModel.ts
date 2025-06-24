@@ -6,7 +6,7 @@ import chokidar from "chokidar";
 import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 import AsyncLock from "async-lock";
-import { ModuleKind, Project, SyntaxKind } from "ts-morph";
+import { Project } from "ts-morph";
 
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
@@ -54,48 +54,8 @@ export module pageObjectModel {
     export async function reload(page: Page) {
         await lock.acquire('reload', async (release) => {
             try {
-                const f = nodePath.parse(currentPageFilePath);
-                const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
-                if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return;
-                
-                const tsconfigFileExists = await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false);
-                const project = new Project({ tsConfigFilePath:  tsconfigFileExists ? 'tsconfig.json' : undefined });
-                const sourceFile = project.addSourceFileAtPath(absolutePath);
-
-                const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
-                if (exportedClass === undefined) return;
-
-                const staticProperties = exportedClass?.getStaticProperties();
-                const staticMethods = exportedClass?.getStaticMethods();
-                
-                //use dynamic import to evaluate selector property values
-                const importPath = absolutePath.replaceAll('\\', '/'); // absolute path with extension
-                const importResult = (await _state.evalScope(`(async function() {
-                    try {
-                      const temporaryEvalResult = await import('${importPath}');
-                      return temporaryEvalResult;
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  })()`));
-                const classInstance = Object.entries(<any>importResult)[0][1] as Function;
-                
-                const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
-                
-                const selectorProperties = staticProperties.filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
-                    .map(prop => {
-                        const name = prop.getName();
-                        const selector = selectorPropertyValues[name];
-                        const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
-                        const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
-                        const selectorMethod = selectorMethodNode ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() } : { name: selectorMethodName, args: [], body: ''};
-                        return { name, selector: selector, selectorMethod };
-                    });
-                const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
-                    .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
-
-                const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${currentPageFilePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}}`;
-                await page.evaluate(evalString);
+                await _reload(page, _state.config.globalPageFilePath);
+                await _reload(page, currentPageFilePath);
                 await page.evaluate('if (reload_page_object_model_elements) reload_page_object_model_elements()');
             } catch (e) {
                 console.error(`error calling page.addScriptTag for page object model ${currentPageFilePath}`);
@@ -105,6 +65,64 @@ export module pageObjectModel {
                 release();
             }
         });
+    }
+
+    async function _reload(page: Page, filePath: string) {
+        const f = nodePath.parse(filePath);
+        const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
+        if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return;
+        
+        const tsconfigFileExists = await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false);
+        const project = new Project({ tsConfigFilePath:  tsconfigFileExists ? 'tsconfig.json' : undefined });
+        const sourceFile = project.addSourceFileAtPath(absolutePath);
+
+        const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
+        if (exportedClass === undefined) return;
+
+        const staticProperties = exportedClass?.getStaticProperties();
+        const staticMethods = exportedClass?.getStaticMethods();
+        
+        //use dynamic import to evaluate selector property values
+        const importPath = absolutePath.replaceAll('\\', '/'); // absolute path with extension
+        const importResult = (await _state.evalScope(`(async function() {
+            try {
+                const temporaryEvalResult = await import('${importPath}');
+                return temporaryEvalResult;
+            } catch (err) {
+                console.error(err);
+            }
+            })()`));
+        const classInstance = Object.entries(<any>importResult)[0][1] as Function;
+        
+        const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
+        
+        const selectorProperties = staticProperties.filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
+            .map(prop => {
+                const name = prop.getName();
+                const selector = selectorPropertyValues[name];
+                const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
+                const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
+                const selectorMethod = selectorMethodNode ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() } : { name: selectorMethodName, args: [], body: ''};
+                return { name, selector: selector, selectorMethod };
+            });
+
+        const nestedPageProperties = staticProperties.filter(prop => _state.config.propertyNestedPageRegex.test(prop.getName()))
+            .map(prop => {
+                const name = prop.getName();
+                //const selector = selectorPropertyValues[name];
+                const _type = prop.getType().getSymbol()!;
+                const fullFilePath = _type.getDeclarations()[0].getSourceFile().getFilePath();
+                const filePath = nodePath.relative(_state.config.path, fullFilePath);
+                return { name, /* selector: selector, */ typeName: _type.getName(), filePath };
+                });
+
+        const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
+            .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
+
+        const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedPageProperties)}}`;
+        await page.evaluate(evalString);
+        
+        for(const x of nestedPageProperties ?? []) await _reload(page, x.filePath); //! recursively reload all nested page objects
     }
 
     async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string, config: { generateClassTemplate: (className: string) => string}) {

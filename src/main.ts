@@ -27,6 +27,7 @@ export module PlaywrightLiveRecorder {
             filenameConvention: '**/*_page.ts',
             baseUrl: <string | undefined>undefined,
             actionTimeout: 5000,
+            globalPageFilePath: 'global_page.ts',
             urlToFilePath: (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
@@ -42,7 +43,8 @@ export module PlaywrightLiveRecorder {
                 return filePath + '_page.ts';
             },
             aliases: {},
-            propertySelectorRegex: /(.+)_selector/,
+            propertySelectorRegex: /(.+)_selector\b/,
+            propertyNestedPageRegex: /(.+)_page\b/,
             primaryActionByCssSelector: [
                 ['input[type="text"], input[type=""], textarea', 'await $1.fill("");'],
                 ['*', 'await $1.click();']

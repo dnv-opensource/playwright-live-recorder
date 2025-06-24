@@ -242,8 +242,15 @@ async function reload_page_object_model_elements() {
   pageObjectFilePath = await PW_urlToFilePath(window.location.href);
   PW_page_object_model_filename.innerText = pageObjectFilePath ?? "Playwright Live Recorder";
 
-  const pageObject = window.PW_pages[pageObjectFilePath];
+  const globalPageObject = window.PW_pages['global_page.ts'];
+  if (globalPageObject !== undefined) await _reload_page_object_model_elements(globalPageObject, 'global_page.ts');
   
+  const pageObject = window.PW_pages[pageObjectFilePath];
+  await _reload_page_object_model_methods(pageObject, pageObjectFilePath);
+  await _reload_page_object_model_elements(pageObject, pageObjectFilePath);
+}
+
+async function _reload_page_object_model_methods(pageObject, pageObjectFilePath) {
   window.PLR_pom_methods_dropdown.innerHTML = "";
   for (var meth of pageObject?.methods ?? []) {
     // {name: string, args: string[], body: method.getText() }
@@ -269,7 +276,9 @@ async function reload_page_object_model_elements() {
     };
     window.PLR_pom_methods_dropdown.appendChild(addFunctionEl);
   }
+}
 
+async function _reload_page_object_model_elements(pageObject, pageObjectFilePath) {
   if (pageObject === undefined) return;
 
   const pageObjectModelImportStatement = await PW_importStatement(pageObject.className, pageObjectFilePath);
@@ -278,7 +287,7 @@ async function reload_page_object_model_elements() {
       try {
         const matchingElements = playwright.locator(prop.selector).elements;
         if (matchingElements.length > 1) {
-          //todo: show a warning somehow
+          //todo: non-unique locator - show a warning somehow
         }
         if (matchingElements.length === 0) {
           console.info(`could not find element for selector ${prop.selector}. skipping.`);
@@ -301,7 +310,12 @@ async function reload_page_object_model_elements() {
         console.log(err);
       }
     }
-  }    
+    //recursively load all nested pages
+    //!warning - this should track what's loaded and don't reload if they already exist (cyclic dependencies)
+    for (var x of pageObject.nestedPages) {
+      await _reload_page_object_model_elements(window.PW_pages[x.filePath], x.filePath);
+    }
+  }
 }
 
 function clearPageObjectModelElements() {
