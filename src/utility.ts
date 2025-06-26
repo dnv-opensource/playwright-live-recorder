@@ -16,3 +16,25 @@ export async function getTestCallingLocation() {
 }
 
 export const _NEWLINE = /\r\n|\n|\r/;
+
+export function createQueuedRunner(asyncFn: (...args: any[]) => Promise<void>) {
+  let isRunning = false;
+  let rerunRequested = false;
+
+  async function runner(...args: any[]) {
+    if (isRunning) {
+      rerunRequested = true;
+      return;
+    }
+
+    isRunning = true;
+    do {
+      rerunRequested = false;
+      await asyncFn(...args);
+    } while (rerunRequested);
+
+    isRunning = false;
+  }
+
+  return runner;
+}

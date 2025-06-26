@@ -220,7 +220,7 @@ async function recordModeClickHandler(event) {
 
 function getNestedPages(pageObjectFilePath) {
   const pom = PW_pages[pageObjectFilePath];
-  const nestedPages = pom.nestedPages;
+  const nestedPages = pom?.nestedPages;
   if (nestedPages === undefined) return [];
   const nestedNestedPages = nestedPages.map(x => getNestedPages(x.filePath))
   return nestedPages.concat(nestedNestedPages.flat());//.uniqueBy(x => x.filePath); //todo - uniqueBy isn't in vanilla JS, fix me

@@ -7,6 +7,7 @@ import { PlaywrightLiveRecorderConfig_pageObjectModel } from "./types";
 import { Page } from "@playwright/test";
 import AsyncLock from "async-lock";
 import { Project } from "ts-morph";
+import { createQueuedRunner } from "./utility";
 
 //scans and watches page object model files, transpiles and exposes page object models to the browser context
 export module pageObjectModel {
@@ -43,7 +44,8 @@ export module pageObjectModel {
             .on('change', /*path*/() => reload(_state.page));
 
         return currentPageFilePath;
-}
+    }
+
     export function _importStatement(className: string, pathFromRoot: string, testFileDir: string) {
         const x = nodePath.parse(nodePath.relative(testFileDir, pathFromRoot));
         let importPath = nodePath.join(x.dir, x.name).replaceAll('\\', '/'); // relative path without extension
@@ -51,11 +53,21 @@ export module pageObjectModel {
         return `import { ${className} } from '${importPath}';`
     }
 
-    export async function reload(page: Page) {
+    export const reload = createQueuedRunner(async (page) => reload2(page));
+    
+    export async function reload2(page: Page) {
+        console.time('pageObjectModel.reload');
         await lock.acquire('reload', async (release) => {
             try {
-                await _reload(page, _state.config.globalPageFilePath);
-                await _reload(page, currentPageFilePath);
+                const filePathsToWatch = await _reload(page, _state.config.globalPageFilePath);
+                filePathsToWatch.push(...await _reload(page, currentPageFilePath));
+                
+                await currentPageFilePathWatcher?.close();
+                const cwd = nodePath.join(process.cwd(), _state.config.path);
+                currentPageFilePathWatcher = chokidar.watch(filePathsToWatch, { cwd })
+                    .on(   'add', /*path*/() => reload(_state.page))
+                    .on('change', /*path*/() => reload(_state.page));
+
                 await page.evaluate('if (reload_page_object_model_elements) reload_page_object_model_elements()');
             } catch (e) {
                 console.error(`error calling page.addScriptTag for page object model ${currentPageFilePath}`);
@@ -65,19 +77,20 @@ export module pageObjectModel {
                 release();
             }
         });
+        console.timeEnd('pageObjectModel.reload');
     }
 
     async function _reload(page: Page, filePath: string) {
         const f = nodePath.parse(filePath);
         const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
-        if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return;
+        if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return [];
         
         const tsconfigFileExists = await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false);
         const project = new Project({ tsConfigFilePath:  tsconfigFileExists ? 'tsconfig.json' : undefined });
         const sourceFile = project.addSourceFileAtPath(absolutePath);
 
         const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
-        if (exportedClass === undefined) return;
+        if (exportedClass === undefined) return [];
 
         const staticProperties = exportedClass?.getStaticProperties();
         const staticMethods = exportedClass?.getStaticMethods();
@@ -131,7 +144,12 @@ export module pageObjectModel {
         const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedTypeProperties)}}`;
         await page.evaluate(evalString);
         
-        for(const x of nestedTypeProperties ?? []) await _reload(page, x.filePath); //! recursively reload all nested page objects
+        const resultFilePaths = [filePath];
+        for(const x of nestedTypeProperties ?? []){
+            resultFilePaths.push(...await _reload(page, x.filePath)); //! recursively reload all nested page objects
+        }
+
+        return resultFilePaths;
     }
 
     async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string, config: { generateClassTemplate: (className: string) => string}) {
