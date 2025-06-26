@@ -44,7 +44,7 @@ export module PlaywrightLiveRecorder {
             },
             aliases: {},
             propertySelectorRegex: /(.+)_selector\b/,
-            propertyNestedPageRegex: /(.+)_page\b/,
+            propertyNestedTypeRegex: /(.+)_page\b/,
             primaryActionByCssSelector: [
                 ['input[type="text"], input[type=""], textarea', 'await $1.fill("");'],
                 ['*', 'await $1.click();']

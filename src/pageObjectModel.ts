@@ -96,33 +96,42 @@ export module pageObjectModel {
         
         const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
         
-        const selectorProperties = staticProperties.filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
+
+        const nestedTypeProps = staticProperties
+            .filter(prop => _state.config.propertyNestedTypeRegex.test(prop.getType().getSymbol()?.getName() ?? ''));
+
+        let selectorProperties = staticProperties
+            .filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
             .map(prop => {
                 const name = prop.getName();
                 const selector = selectorPropertyValues[name];
                 const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
                 const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
-                const selectorMethod = selectorMethodNode ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() } : { name: selectorMethodName, args: [], body: ''};
+                const selectorMethod = selectorMethodNode 
+                    ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() }
+                    : { name: selectorMethodName, args: [], body: ''};
                 return { name, selector: selector, selectorMethod };
             });
 
-        const nestedPageProperties = staticProperties.filter(prop => _state.config.propertyNestedPageRegex.test(prop.getName()))
-            .map(prop => {
-                const name = prop.getName();
-                //const selector = selectorPropertyValues[name];
-                const _type = prop.getType().getSymbol()!;
-                const fullFilePath = _type.getDeclarations()[0].getSourceFile().getFilePath();
-                const filePath = nodePath.relative(_state.config.path, fullFilePath);
-                return { name, /* selector: selector, */ typeName: _type.getName(), filePath };
-                });
+        const nestedTypeProperties = nestedTypeProps.map(prop => {
+            const name = prop.getName();
+            //const selectorPropName = _state.config.propertySelectorRegex.exec(name)?.[1]!;
+            const selectorProp = selectorProperties.find(p => pageObjectModel._state.config.propertySelectorRegex.exec(p.name)?.[1] == name)!;
+            const _type = prop.getType().getSymbol()!;
+            const fullFilePath = _type.getDeclarations()[0].getSourceFile().getFilePath();
+            const filePath = nodePath.relative(_state.config.path, fullFilePath);
+            return { name, selectorPropertyName: selectorProp.name, selector: selectorProp.selector, filePath };
+        });
+
+        selectorProperties = selectorProperties.filter(p => !nestedTypeProperties.some(n => n.selectorPropertyName === p.name));
 
         const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
             .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
 
-        const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedPageProperties)}}`;
+        const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedTypeProperties)}}`;
         await page.evaluate(evalString);
         
-        for(const x of nestedPageProperties ?? []) await _reload(page, x.filePath); //! recursively reload all nested page objects
+        for(const x of nestedTypeProperties ?? []) await _reload(page, x.filePath); //! recursively reload all nested page objects
     }
 
     async function _appendToPageObjectModel(fullRelativePath: string, className: string, codeBlock: string, config: { generateClassTemplate: (className: string) => string}) {

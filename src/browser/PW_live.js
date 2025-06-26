@@ -116,7 +116,7 @@ function toggleRecordMode(checked) {
 }
 
 function updateTooltipContents(element) {
-  const convention = document.PW_getSelectorConventionForElement(element);
+  const convention = PW_getSelectorConventionForElement(element);
   if (convention == undefined) return;
 
   const matcher = convention.match(element);
@@ -188,12 +188,15 @@ async function recordModeClickHandler(event) {
   if (element == null) return;
   
   let newItemName;
-  const selectorConvention = document.PW_getSelectorConventionForElement(element);
+  const selectorConvention = PW_getSelectorConventionForElement(element);
   if (config.pageObjectModel.enabled && !selectorConvention.isPageObjectModel) {
-    newItemName = window.prompt("Page object model item name?");
+    dataTestId = element.closest('[data-testid]')?.getAttribute('data-testid');
+    newItemName = window.prompt("Page object model item name?", dataTestId);
     if (newItemName != null) {
       const selector = selectorConvention.match(element);
-      await PW_appendToPageObjectModel(pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
+      const nestedPages = getNestedPages(pageObjectFilePath).concat(getNestedPages('global_page.ts'));
+      const nestedPageObjectFilePath = nestedPages.find(x => element.closest(x.selector) !== null)?.filePath;
+      await PW_appendToPageObjectModel(nestedPageObjectFilePath ?? pageObjectFilePath, config.pageObjectModel.generatePropertyTemplate(newItemName, selector));
     } else {
       const selector = selectorConvention.match(element);
       navigator.clipboard.writeText(selector); //navigator.clipboard is undefined when running? troubleshoot me
@@ -215,10 +218,19 @@ async function recordModeClickHandler(event) {
   }
 }
 
-document.PW_getSelectorConventionForElement = function (el) {
+function getNestedPages(pageObjectFilePath) {
+  const pom = PW_pages[pageObjectFilePath];
+  const nestedPages = pom.nestedPages;
+  if (nestedPages === undefined) return [];
+  const nestedNestedPages = nestedPages.map(x => getNestedPages(x.filePath))
+  return nestedPages.concat(nestedNestedPages.flat());//.uniqueBy(x => x.filePath); //todo - uniqueBy isn't in vanilla JS, fix me
+}
+
+PW_getSelectorConventionForElement = function (el) {
   const allSelectorConventions = [...PW_selector_pageObjectModel_conventions, ...(PW_selectorConventions ?? []), ...PW_selector_base_conventions];
   return allSelectorConventions.find((i) => i.match(el) != null /* null or undefined */);
 };
+
 window.addEventListener("keydown", keyChord_toggleRecordMode);
 window.addEventListener("mousemove", mousemove_updateTooltip);
 window.addEventListener("click", recordModeClickHandler, true);
@@ -310,11 +322,9 @@ async function _reload_page_object_model_elements(pageObject, pageObjectFilePath
         console.log(err);
       }
     }
+    
     //recursively load all nested pages
-    //!warning - this should track what's loaded and don't reload if they already exist (cyclic dependencies)
-    for (var x of pageObject.nestedPages) {
-      await _reload_page_object_model_elements(window.PW_pages[x.filePath], x.filePath);
-    }
+    for (var x of pageObject.nestedPages) await _reload_page_object_model_elements(window.PW_pages[x.filePath], x.filePath);
   }
 }
 
@@ -322,7 +332,7 @@ function clearPageObjectModelElements() {
   if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
 
   //clean up any rogue elements
-  const pageObjectModelAttributes = ['data-page-object-model', 'data-page-object-model-import', 'data-page-object-model-primary-action', 'data-page-object-model-secondary-actions'];
+  const pageObjectModelAttributes = ['[data-page-object-model]', '[data-page-object-model-import]', '[data-page-object-model-primary-action]', '[data-page-object-model-secondary-actions]'];
   document.querySelectorAll(pageObjectModelAttributes.join(', ')).forEach(el => {
     pageObjectModelAttributes.forEach(attr => el.removeAttribute(attr));
     config.pageObjectModel.overlay.off(el)

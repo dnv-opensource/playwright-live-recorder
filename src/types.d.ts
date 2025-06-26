@@ -50,7 +50,7 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector\b/*/
     propertySelectorRegex: RegExp,
     /** @remarks Use this to find list of nested page objects within a given page object model file @default /(.+)_page\b/*/
-    propertyNestedPageRegex: RegExp,
+    propertyNestedTypeRegex: RegExp,
     /** @remarks Use this to specify the text appended when LEFT clicked on in record mode @default [ ["input[type="text"]", 'fill()'], ["textarea", 'fill()'], ["/.*\/", "click()"] ] */
     primaryActionByCssSelector: [string, string][],
     /** @remarks Use this to specify the text appended when RIGHT clicked on in record mode @default [ ["input[type="text"]", "await expect($1.innerText()).toContain('')"], ["textarea", "innerText().toContain('')"], ["/.*\/", ""]]*/
