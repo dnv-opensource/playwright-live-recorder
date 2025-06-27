@@ -59,8 +59,7 @@ export module pageObjectModel {
         console.time('pageObjectModel.reload');
         await lock.acquire('reload', async (release) => {
             try {
-                const filePathsToWatch = await _reload(page, _state.config.globalPageFilePath);
-                filePathsToWatch.push(...await _reload(page, currentPageFilePath));
+                const filePathsToWatch = await _reload(page, [_state.config.globalPageFilePath, currentPageFilePath]);
                 
                 await currentPageFilePathWatcher?.close();
                 const cwd = nodePath.join(process.cwd(), _state.config.path);
@@ -80,73 +79,78 @@ export module pageObjectModel {
         console.timeEnd('pageObjectModel.reload');
     }
 
-    async function _reload(page: Page, filePath: string) {
-        const f = nodePath.parse(filePath);
-        const absolutePath = nodePath.join(process.cwd(), _state.config.path, f.dir, f.base);
-        if (!await fs.access(absolutePath).then(() => true).catch(() => false)) return [];
-        
-        const tsconfigFileExists = await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false);
-        const project = new Project({ tsConfigFilePath:  tsconfigFileExists ? 'tsconfig.json' : undefined });
-        const sourceFile = project.addSourceFileAtPath(absolutePath);
+    async function _reload(page: Page, filePaths: string[], project?: Project) {
+        const all = await Promise.all(filePaths.map(async filePath => {
+            const parsed = nodePath.parse(filePath);
+            const absolutePath = nodePath.join(process.cwd(), _state.config.path, parsed.dir, parsed.base);
+            const exists = fs.access(absolutePath).then(() => true).catch(() => false);
+            return ({ filePath, parsed, absolutePath, exists });
+        }));
 
-        const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
-        if (exportedClass === undefined) return [];
+        const existingPaths = all.filter(x => x.exists);
+        if (existingPaths.length === 0) return [];
 
-        const staticProperties = exportedClass?.getStaticProperties();
-        const staticMethods = exportedClass?.getStaticMethods();
+        project = project ?? new Project({ tsConfigFilePath: await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false) ? 'tsconfig.json' : undefined });
         
-        //use dynamic import to evaluate selector property values
-        const importPath = absolutePath.replaceAll('\\', '/'); // absolute path with extension
-        const importResult = (await _state.evalScope(`(async function() {
-            try {
-                const temporaryEvalResult = await import('${importPath}');
-                return temporaryEvalResult;
-            } catch (err) {
-                console.error(err);
-            }
-            })()`));
-        const classInstance = Object.entries(<any>importResult)[0][1] as Function;
-        
-        const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
-        
+        const resultFilePaths = existingPaths.map(e => e.filePath);
+        for(const p of existingPaths) {
+            const sourceFile = project.addSourceFileAtPath(p.absolutePath);
 
-        const nestedTypeProps = staticProperties
-            .filter(prop => _state.config.propertyNestedTypeRegex.test(prop.getType().getSymbol()?.getName() ?? ''));
+            const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
+            if (exportedClass === undefined) return [];
 
-        let selectorProperties = staticProperties
-            .filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
-            .map(prop => {
+            const staticProperties = exportedClass?.getStaticProperties();
+            const staticMethods = exportedClass?.getStaticMethods();
+        
+            //use dynamic import to evaluate selector property values
+            const importPath = p.absolutePath.replaceAll('\\', '/'); // absolute path with extension
+            const importResult = (await _state.evalScope(`(async function() {
+                try {
+                    const temporaryEvalResult = await import('${importPath}');
+                    return temporaryEvalResult;
+                } catch (err) {
+                    console.error(err);
+                }
+                })()`));
+            const classInstance = Object.entries(<any>importResult)[0][1] as Function;
+            
+            const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
+
+            const nestedTypeProps = staticProperties
+                .filter(prop => _state.config.propertyNestedTypeRegex.test(prop.getType().getSymbol()?.getName() ?? ''));
+
+            let selectorProperties = staticProperties
+                .filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
+                .map(prop => {
+                    const name = prop.getName();
+                    const selector = selectorPropertyValues[name];
+                    const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
+                    const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
+                    const selectorMethod = selectorMethodNode 
+                        ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() }
+                        : { name: selectorMethodName, args: [], body: ''};
+                    return { name, selector: selector, selectorMethod };
+                });
+
+            const nestedTypeProperties = nestedTypeProps.map(prop => {
                 const name = prop.getName();
-                const selector = selectorPropertyValues[name];
-                const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
-                const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
-                const selectorMethod = selectorMethodNode 
-                    ? { name: selectorMethodNode.getName(), args: selectorMethodNode.getParameters().map(p => p.getName()), body: selectorMethodNode.getText() }
-                    : { name: selectorMethodName, args: [], body: ''};
-                return { name, selector: selector, selectorMethod };
+                //const selectorPropName = _state.config.propertySelectorRegex.exec(name)?.[1]!;
+                const selectorProp = selectorProperties.find(p => pageObjectModel._state.config.propertySelectorRegex.exec(p.name)?.[1] == name)!;
+                const _type = prop.getType().getSymbol()!;
+                const fullFilePath = _type.getDeclarations()[0].getSourceFile().getFilePath();
+                const filePath = nodePath.relative(_state.config.path, fullFilePath);
+                return { name, selectorPropertyName: selectorProp.name, selector: selectorProp.selector, filePath };
             });
 
-        const nestedTypeProperties = nestedTypeProps.map(prop => {
-            const name = prop.getName();
-            //const selectorPropName = _state.config.propertySelectorRegex.exec(name)?.[1]!;
-            const selectorProp = selectorProperties.find(p => pageObjectModel._state.config.propertySelectorRegex.exec(p.name)?.[1] == name)!;
-            const _type = prop.getType().getSymbol()!;
-            const fullFilePath = _type.getDeclarations()[0].getSourceFile().getFilePath();
-            const filePath = nodePath.relative(_state.config.path, fullFilePath);
-            return { name, selectorPropertyName: selectorProp.name, selector: selectorProp.selector, filePath };
-        });
+            selectorProperties = selectorProperties.filter(p => !nestedTypeProperties.some(n => n.selectorPropertyName === p.name));
 
-        selectorProperties = selectorProperties.filter(p => !nestedTypeProperties.some(n => n.selectorPropertyName === p.name));
+            const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
+                .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
 
-        const helperMethods = staticMethods.filter(m => !selectorProperties.some(p => m.getName() === _state.config.propertySelectorRegex.exec(p.name)?.[1]))
-            .map(method => ({name: method.getName(), args: method.getParameters().map(p => p.getName()), body: method.getText()}));
+            const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${p.filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedTypeProperties)}}`;
+            await page.evaluate(evalString);
 
-        const evalString = `if (!PW_pages) {PW_pages = {}; } PW_pages[\`${filePath}\`] = { className: '${exportedClass.getName()}', selectors: ${JSON.stringify(selectorProperties)}, methods: ${JSON.stringify(helperMethods)}, nestedPages: ${JSON.stringify(nestedTypeProperties)}}`;
-        await page.evaluate(evalString);
-        
-        const resultFilePaths = [filePath];
-        for(const x of nestedTypeProperties ?? []){
-            resultFilePaths.push(...await _reload(page, x.filePath)); //! recursively reload all nested page objects
+            if (nestedTypeProperties.length > 0) resultFilePaths.push(...await _reload(page, nestedTypeProperties.map(n => n.filePath), project)); //! recursively reload all nested page objects
         }
 
         return resultFilePaths;
