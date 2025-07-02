@@ -23,7 +23,7 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     path: string,
     /** @default '**\/*_page.ts' */
     filenameConvention: string,
-    /** @default (use.baseURL value from Playwright config) */
+    /** @default use.baseURL value from Playwright config */
     baseUrl: string|undefined,
     /** @default 5000 */
     actionTimeout: number,
@@ -32,12 +32,15 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     /** @default (url: string, aliases: {[key: string]: string}) => {
                 let filePath = url
                     .replace(new RegExp(`^${config.pageObjectModel.baseUrl}`), '') //cut out base url
-                    .replaceAll(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
-                    .replaceAll(/\/d+\//g, '/') // cut out /###/ fragments
-                    .replaceAll('-', '_')       //replace all hyphens with underscores, valid classname
-                    .replaceAll('//', '/')      // if we end up with two // in a row, replace it with one
-                    .replace(/\/$/, '')         // clear trailing /
-                    .replace(/^\//, '');        // clear leading /
+                    .replace(/[a-fA-F0-9]{8}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{4}-?[a-fA-F0-9]{12}/g, '') //cut out guids
+                    .replace(/\/\d+(?=\/)/g, '/')   // cut out /###/ fragments
+                    .replace(/\d+\//g, '/')         // cut out /###/ fragments if there were any left over
+                    .replace(/\/\d+$/g, '/')        // cut out /### fragments at end
+                    .replace(/-/g, '_')             //replace all hyphens with underscores, valid classname
+                    .replace(/\/\/+/g, '/')         // if we end up with two // in a row, replace it with one
+                    .replace(/\/$/, '')             // clear trailing /
+                    .replace(/^\//, '');            // clear leading /
+
                 if (filePath in aliases) filePath = aliases[filePath]; //apply aliases
                 return filePath + '_page.ts';
             }

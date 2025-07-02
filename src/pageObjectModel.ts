@@ -38,11 +38,6 @@ export module pageObjectModel {
         if (newfilePath === currentPageFilePath) return currentPageFilePath;
         currentPageFilePath = newfilePath;
 
-        await currentPageFilePathWatcher?.close();
-        const cwd = nodePath.join(process.cwd(), _state.config.path);
-        currentPageFilePathWatcher = chokidar.watch(currentPageFilePath, { cwd, ignoreInitial: true })
-            .on(   'add', /*path*/() => reload(_state.page))
-            .on('change', /*path*/() => reload(_state.page));
         await reload(_state.page);
         return currentPageFilePath;
     }
@@ -60,7 +55,6 @@ export module pageObjectModel {
         console.time('pageObjectModel.reload');
         await lock.acquire('reload', async (release) => {
             try {
-                
                 _project = _project ?? new Project({ tsConfigFilePath: await fs.access(nodePath.join(process.cwd(), 'tsconfig.json')).then(() => true).catch(() => false) ? 'tsconfig.json' : undefined });
                 const filePathsToWatch = await _reload(page, [_state.config.globalPageFilePath, currentPageFilePath], _project);
                 
@@ -70,7 +64,6 @@ export module pageObjectModel {
                     .on(   'add', /*path*/() => reload(_state.page))
                     .on('change', /*path*/() => reload(_state.page));
 
-                await reload(_state.page);
                 await page.evaluate('if (reload_page_object_model_elements) reload_page_object_model_elements()');
             } catch (e) {
                 console.error(`error calling page.addScriptTag for page object model ${currentPageFilePath}`);

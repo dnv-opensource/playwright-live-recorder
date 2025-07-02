@@ -241,18 +241,22 @@ window.addEventListener("click", recordModeClickHandler, true);
 
 /******** page object model feature ********/
 
-window.navigation.onnavigatesuccess = async () => await reload_page_object_model_elements();
+window.navigation.onnavigatesuccess = async () => await reload_page();
 //window.setInterval(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
 
 
 var pageObjectFilePath = "";
 
-async function reload_page_object_model_elements() {
-  clearPageObjectModelElements();
+async function reload_page() {
   if (PW_urlToFilePath === undefined) return; //test backend hasn't injected functions yet
   //get current page object to reflect across
   pageObjectFilePath = await PW_urlToFilePath(window.location.href);
   PW_page_object_model_filename.innerText = pageObjectFilePath ?? "Playwright Live Recorder";
+  await reload_page_object_model_elements();
+}
+
+async function reload_page_object_model_elements() {
+  //clearPageObjectModelElements();
 
   const globalPageObject = window.PW_pages['global_page.ts'];
   if (globalPageObject !== undefined) await _reload_page_object_model_elements(globalPageObject, 'global_page.ts');
@@ -390,4 +394,4 @@ function show_toast(timeoutMs) {
 }
 
 clearPageObjectModelElements();
-setTimeout(() => reload_page_object_model_elements(), 1000);
+setTimeout(() => reload_page(), 1000);
