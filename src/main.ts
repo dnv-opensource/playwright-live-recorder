@@ -70,8 +70,7 @@ export class ${className} {
             overlay: {
                 color: 'salmon',
                 on: (el: HTMLElement, color: string) => {
-                    if (el.getAttribute('data-background')) return;
-                    el.setAttribute('data-background', el.style.background);
+                    if (el.getAttribute('data-background') == null) el.setAttribute('data-background', el.style.background);
                     el.style.background = color ?? 'salmon';
                 },
                 off: (el: HTMLElement) => el.style.background = el.getAttribute('data-background') ?? '',

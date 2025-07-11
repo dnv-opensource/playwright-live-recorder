@@ -92,6 +92,7 @@ export module pageObjectModel {
         const resultFilePaths = existingPaths.map(e => e.filePath);
         for(const p of existingPaths) {
             const sourceFile = project.addSourceFileAtPath(p.absolutePath);
+            await sourceFile.refreshFromFileSystem();
 
             const exportedClass = sourceFile.getClasses().find(cls => cls.isExported());
             if (exportedClass === undefined) return [];
@@ -109,10 +110,8 @@ export module pageObjectModel {
                     console.error(err);
                 }
                 })()`));
-            const classInstance = Object.entries(<any>importResult)[0][1] as Function;
+            const classInstance = Object.entries(<any>importResult)[0][1] as any;
             
-            const selectorPropertyValues = _(Object.keys(classInstance).filter(key => _state.config.propertySelectorRegex.test(key))).keyBy(x => x).mapValues(key => (<any>classInstance)[key]).value();
-
             const nestedTypeProps = staticProperties
                 .filter(prop => _state.config.propertyNestedTypeRegex.test(prop.getType().getSymbol()?.getName() ?? ''));
 
@@ -120,7 +119,7 @@ export module pageObjectModel {
                 .filter(prop => _state.config.propertySelectorRegex.test(prop.getName()))
                 .map(prop => {
                     const name = prop.getName();
-                    const selector = selectorPropertyValues[name];
+                    const selector = classInstance[name];
                     const selectorMethodName = _state.config.propertySelectorRegex.exec(name)?.[1];
                     const selectorMethodNode = staticMethods.find(m => m.getName() === selectorMethodName);
                     const selectorMethod = selectorMethodNode 

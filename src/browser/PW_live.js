@@ -256,7 +256,7 @@ async function reload_page() {
 }
 
 async function reload_page_object_model_elements() {
-  //clearPageObjectModelElements();
+  clearPageObjectModelElements();
 
   const globalPageObject = window.PW_pages['global_page.ts'];
   if (globalPageObject !== undefined) await _reload_page_object_model_elements(globalPageObject, 'global_page.ts');
@@ -336,10 +336,10 @@ function clearPageObjectModelElements() {
   if (window.PW_overlays !== undefined) for (const el of window.PW_overlays) config.pageObjectModel.overlay.off(el);
 
   //clean up any rogue elements
-  const pageObjectModelAttributes = ['[data-page-object-model]', '[data-page-object-model-import]', '[data-page-object-model-primary-action]', '[data-page-object-model-secondary-actions]'];
-  document.querySelectorAll(pageObjectModelAttributes.join(', ')).forEach(el => {
+  const pageObjectModelAttributes = ['data-page-object-model', 'data-page-object-model-import', 'data-page-object-model-primary-action', 'data-page-object-model-secondary-actions'];
+  document.querySelectorAll(pageObjectModelAttributes.map(x => `[${x}]`).join(', ')).forEach(el => {
     pageObjectModelAttributes.forEach(attr => el.removeAttribute(attr));
-    config.pageObjectModel.overlay.off(el)
+    config.pageObjectModel.overlay.off(el);
   });
   window.PW_overlays = [];
 }
