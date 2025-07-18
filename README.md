@@ -1,3 +1,28 @@
+### v2.0.59
+* added basic support for #16 `Support 'global' page object` and #3 `support nested page object models`
+
+### v2.0.57
+* updated readme, recorded demo video
+
+### v2.0.56
+* cli command fix
+
+### v2.0.53
+* Display currently executing lines of code in repl on-screen
+* fix many issues after page navigation (tool only worked for SPAs previously)
+* changed (broken) postinstall to cli command `npx @dnvgl/playwright-live-recorder`
+
+### v2.0.52
+* UI rework
+* Now aware of Page Object Model helper methods
+
+### v2.0.48
+* Live code execution method much simplified and much more robust (todo: write tech doc about this)
+* bugfix: Make page object model tools build correct paths on non-windows filesystems
+
+----
+
+
 ![Playwright live recorder infographic](docs/playwright-live-recorder-infographic.png "Playwright live recorder infographic")
 
 

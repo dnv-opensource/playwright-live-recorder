@@ -179,7 +179,7 @@ export module pageObjectModel {
     function classNameFromPath(path: string) { return /([^/]+).ts/.exec(path)![1]; }
     function fullRelativePath(path: string, config: { path: string }) { return nodePath.normalize(nodePath.join(config.path, path)); }
 
-    export async function reloadAll(page: Page) {
+    export async function reloadAll(configPath: string, page: Page) {
         if (!currentPageFilePath) return;
         await reload(page);
     }

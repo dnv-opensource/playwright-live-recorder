@@ -9,8 +9,9 @@ import { testFileWriter } from "./testFileWriter";
 import { hotModuleReload } from "./hotModuleReload";
 import { pageObjectModel } from "./pageObjectModel";
 import { getTestCallingLocation } from "./utility";
+import fs from 'fs/promises';
 import process from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { ts } from "ts-morph";
 import { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile, PlaywrightLiveRecorderConfig_recorder, PlaywrightLiveRecorderConfig_pageObjectModel, PlaywrightLiveRecorderConfig_diagnostic, TestCallingLocation } from "./types";
 export { PlaywrightLiveRecorderConfig, PlaywrightLiveRecorderConfigFile, PlaywrightLiveRecorderConfig_recorder, PlaywrightLiveRecorderConfig_pageObjectModel, PlaywrightLiveRecorderConfig_diagnostic, TestCallingLocation };
 
@@ -165,7 +166,7 @@ export class ${className} {
             await page.addScriptTag({ path: config.recorder.path });
             await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });
             await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
-            await pageObjectModel.reloadAll(page);
+            await pageObjectModel.reloadAll(config.pageObjectModel.path, page);
         });
 
         page.on('dialog', dialog => {/* allow user interaction for browser input dialog interaction */ });
@@ -183,13 +184,23 @@ export class ${className} {
 
     export let configFilePath = './live-recorder.config.ts';
     export async function _configFromFile() {
+        //todo - try rewriting to use dynamic import instead
         try {
-            const cacheBustedUrl = `${pathToFileURL(nodePath.resolve(configFilePath)).href}?t=${Date.now()}`;
-            return (await import(cacheBustedUrl)).default as PlaywrightLiveRecorderConfig | undefined;
-        } catch (err: any) {
-            if (err.code === 'ERR_MODULE_NOT_FOUND' || err.code === 'MODULE_NOT_FOUND') return;
-            console.error('Error loading config file:', err);
+            const fileContents = await fs.readFile(configFilePath, { encoding: 'utf8' });
+            const transpiled = ts.transpileModule(fileContents, { compilerOptions: { module: ts.ModuleKind.ESNext, strict: false } });
+            const cleanedUp = _cleanUpTranspiledSource(transpiled.outputText);
+            const obj = eval(cleanedUp);
+            return <PlaywrightLiveRecorderConfig | undefined>obj;
+        } catch (err) {
+            if ((<any>err).code === 'MODULE_NOT_FOUND') return;
+            console.error(err);
         }
+    }
+
+    function _cleanUpTranspiledSource(transpiled: string) {
+        return transpiled
+            .replaceAll(/\bimport\b\s*({?\s*[^};]+}?)\s*from\s*([^;]*);?/g, '')
+            .replace('export default ', '');
     }
 
 
