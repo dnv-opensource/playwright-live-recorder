@@ -49,26 +49,27 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
     /**
      * @remarks use to override/alias url fragments to page object model name
      * @example { '': 'home', 'login/corporate' : 'login', 'login/personal' : 'login' } //redirect from root address to 'home' pom. use same pom for login/corporate and login/personal
+     * @default {}
     */    aliases: {[key: string]: string},
     /** @remarks Use this to find list of all selectors, and lookup method from selector @default /(.+)_selector\b/*/
     propertySelectorRegex: RegExp,
     /** @remarks Use this to find list of nested page objects within a given page object model file @default /(.+)_page\b/*/
     propertyNestedTypeRegex: RegExp,
-    /** @remarks Use this to specify the text appended when LEFT clicked on in record mode @default [ ["input[type="text"]", 'fill()'], ["textarea", 'fill()'], ["/.*\/", "click()"] ] */
+    /** @remarks Use this to specify the text appended when LEFT clicked on in record mode @default [ ['input[type="text"], input[type=""], textarea', 'await $1.fill("");'], ['*', 'await $1.click();'] ] */
     primaryActionByCssSelector: [string, string][],
-    /** @remarks Use this to specify the text appended when RIGHT clicked on in record mode @default [ ["input[type="text"]", "await expect($1.innerText()).toContain('')"], ["textarea", "innerText().toContain('')"], ["/.*\/", ""]]*/
+    /** @remarks Use this to specify the text appended when RIGHT clicked on in record mode @default [ ['input[type="text"], textarea', 'await expect($1.innerText()).toContain("");'], ['*', 'await expect($1.innerText()).toContain("");'], ['*', 'await expect($1).toBeVisible();'], ['*', 'await expect($1).toBeEnabled();'] ]*/
     secondaryActionByCssSelector: [string, string][],
     /** @default (className) => 
-    `import { Page } from "@playwright/test";
+    `import type { Page } from '@playwright/test';
 
-    export class ${className} {
+export class ${className} {
 
-    }`,
+}`,
     */
     generateClassTemplate: (className: string) => string,
     /** @default  (name, selector) => 
     `    private static ${name}_selector = \`${selector}\`;\r\n` + 
-    `    static ${name}(page: Page) { return page.locator(\`this.${name}_selector\`); }\r\n\r\n`,
+    `    static ${name}(page: Page) { return page.locator(this.${name}_selector); }\r\n\r\n`,
     */
     generatePropertyTemplate: (name: string, selector: string) => string,
     
@@ -80,14 +81,42 @@ export type PlaywrightLiveRecorderConfig_pageObjectModel = {
         /** @default 'salmon' */
         color: string,
         /** @default (el, color) => {
-            el.setAttribute('data-background', el.style.background);
-            el.style.background = color;
+            if (el.getAttribute('data-background') == null) el.setAttribute('data-background', el.style.background);
+            el.style.background = color ?? 'salmon';
         },
         */
         on: (el: HTMLElement, color: string) => void,
         /** @default (el) => el.style.background = el.getAttribute('data-background') ?? '', */
         off: (el: HTMLElement) => void,
     },
+    /** @default `data:text/javascript,
+                import { promises as fs } from 'fs';
+                import { fileURLToPath } from 'url';
+                
+                const resolvedFilenames = new Set();
+                
+                export async function resolve(specifier, context, nextResolve) {
+                  const resolved = await nextResolve(specifier, context);
+                  if (!resolved.url.endsWith('.ts')) return resolved;
+                
+                  const urlFilename = fileURLToPath(resolved.url);
+                  const modifyMs = await fs.stat(urlFilename).then(stat => Math.floor(stat.mtimeMs));
+                  resolved.url = resolved.url.replace(/.ts$/, '.cachebust.' + modifyMs + '.ts');
+                  return resolved;
+                }
+                
+                export async function load(url, context, nextLoad) {
+                  const original = url.replace(/\\.cachebust\\.\\d+.ts$/, '.ts');
+                  if (original === url || resolvedFilenames.has(url)) return await nextLoad(url, context);
+                  const urlFilename = fileURLToPath(url);
+                  const originalFilename = fileURLToPath(original);
+                  await fs.copyFile(originalFilename, urlFilename);
+                  const result = await nextLoad(url, context);
+                  await fs.rm(urlFilename);
+                  resolvedFilenames.add(url);
+                  return result;
+                }
+                ` */
     importerCustomizationHooks: string,
 }
 
