@@ -241,7 +241,14 @@ window.addEventListener("click", recordModeClickHandler, true);
 
 /******** page object model feature ********/
 
-window.navigation.onnavigatesuccess = async () => await reload_page();
+window.navigation.onnavigatesuccess = async () => {
+  void reload_page();
+  //if record mode is on, emit page.url assertion
+  if (!recordModeOn) return;
+  const urlAssertion = window.location.href.replace(window.location.origin, '').replace(/\//g,'\\/');
+  PW_appendToTest(`await expect(page).toHaveURL(/${urlAssertion}$/);`);
+};
+
 //window.setInterval(async () => await reload_page_object_model_elements(), 5000); //refresh the page object model highlighting every 5 seconds in case on-screen elements have changed
 
 
@@ -274,7 +281,7 @@ async function _reload_page_object_model_methods(pageObject, pageObjectFilePath)
     const isAsync = meth.body.includes("async");
     const codeLine = `${isAsync ? 'await ':''}${pageObject.className}.${meth.name}(${meth.args.join(', ')});`
     const el = document.createElement("li");
-    el.onclick = () => PW_appendToTest(codeLine, pageObjectModelImportStatement);
+    el.onclick = async () => PW_appendToTest(codeLine, await PW_importStatement(pageObject.className, pageObjectFilePath));
     el.innerText = `${meth.name}(${meth.args.join(', ')})`;
 
     window.PLR_pom_methods_dropdown.appendChild(el);
