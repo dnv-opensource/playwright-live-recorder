@@ -39,7 +39,7 @@ export module hotModuleReload {
     export async function _reloadTestFile(s: hotModuleReloadState) {
         await lock.acquire('reloadTestFile', async (release) => {
             try {
-                s.imports = _extractImports(s.t.file);        
+                s.imports = _extractImports(s.t.file);
                 const newTestFnContents = await (_extractFnContents(s.t.file, s.t.testLine, s.t.testLineNumber, s.t.executingLine)) ?? '';
                 const blockToExecute = _getBlockToExecute(s.testFnContents, newTestFnContents);
                 s.testFnContents = newTestFnContents;
@@ -54,12 +54,11 @@ export module hotModuleReload {
 
     async function evalLines(lines: string) {
         const importsBlock = _rewriteAsDynamicImports(_state.imports).join('\n');
-        const wrappedEvalLines = _wrapAsyncAsPromise(importsBlock + '\n\n' + lines, _extractVariableListFrom(lines));
+        const wrappedEvalLines = _wrapAsyncAsPromiseWithTimeout(importsBlock + '\n\n' + lines, _extractVariableListFrom(lines));
         return _evalCore(_state.evalScope, _state.pageEvaluate, wrappedEvalLines, lines);
     }
 
-    function _rewriteAsDynamicImports(imports: ImportDeclaration[]) 
-    {
+    function _rewriteAsDynamicImports(imports: ImportDeclaration[]) {
         return imports.map(importDecl => {
             const namedImports = importDecl.getNamedImports().map(namedImport => namedImport.getName()).join(', ');
             const moduleSpecifier = importDecl.getModuleSpecifier().getLiteralText();
@@ -67,15 +66,17 @@ export module hotModuleReload {
         });
     }
 
-    export function _wrapAsyncAsPromise(codeBlock: string, variables: string[]) {
-        return `(async function() {
+    export function _wrapAsyncAsPromiseWithTimeout(codeBlock: string, variables: string[], timeoutMs: number = 5000) {
+        return `
+(async function() {
   try {
 ${codeBlock}
 ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(', ')}});`}
   } catch (err) {
     console.error(err);
   }
-})()`;
+})()
+`;
     }
 
     export function _extractVariableListFrom(blockToExecute: string) {
@@ -91,23 +92,27 @@ ${variables.length === 0 ? `` : `Object.assign(globalThis, { ${variables.join(',
         return variableNames.flat();
     }
 
+    function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+        return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs))]);
+    }
+
     let _evalCoreCount = 1;
     export async function _evalCore(evalScope: (s: string) => any, pageEvaluate: (pageFunction: string) => Promise<unknown>, codeBlock: string, codeBlockDescription: string) {
         const i = _evalCoreCount++;
-        
+
         let result;
         try {
             await pageEvaluate(`PW_callback_begin_executing(${i}, \`${codeBlockDescription}\`, \`${codeBlock}\`)`);
-            result = await evalScope(codeBlock);
+            result = await withTimeout(evalScope(codeBlock), 5000);
             const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, true, ${JSON.stringify(result)}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`;
             await pageEvaluate(evalString);
         } catch (error) {
             if (error instanceof Error) {
-                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, ${error.message}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`
+                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, ${JSON.stringify(error.message)}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`
                 await pageEvaluate(evalString);
                 console.warn(error);
             } else {
-                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, \`${JSON.stringify(error)}\`, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`;
+                const evalString = `setTimeout(function() { var fn = (window.PW_callback_finished_executing === undefined) ? console.log : window.PW_callback_finished_executing; fn(${i}, false, ${JSON.stringify(error)}, \`${codeBlockDescription}\`, \`${codeBlock}\`); }, window.PW_callback_finished_executing === undefined ? 1000 : 0);`;
                 await pageEvaluate(evalString);
                 console.error(error);
             }
