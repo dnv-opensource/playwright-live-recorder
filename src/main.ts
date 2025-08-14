@@ -153,6 +153,7 @@ export class ${className} {
         await recorder.init(config.recorder, page);
 
         await page.exposeFunction('PW_config', () => PW_config()); //expose config to browser
+        await page.addScriptTag({ type: 'module', content: `import { finder } from 'https://cdn.jsdelivr.net/npm/@medv/finder';\nwindow.finder = finder;` });
         await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath }); //loading these scripts first, pageObjectModel.init watchers are dependent upon methods exposed here
         await page.addStyleTag({ path: config.diagnostic.browserCodeCSSPath });
 
@@ -162,6 +163,7 @@ export class ${className} {
         }
 
         page.on('load', async page => {
+            await page.addScriptTag({ type: 'module', content: `import { finder } from 'https://cdn.jsdelivr.net/npm/@medv/finder';\nwindow.finder = finder;` });
             await page.addScriptTag({ path: config.recorder.basepath });
             await page.addScriptTag({ path: config.recorder.path });
             await page.addScriptTag({ path: config.diagnostic.browserCodeJSPath });

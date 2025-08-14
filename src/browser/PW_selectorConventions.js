@@ -25,6 +25,6 @@ var PW_selectorConventions = [
 
 var PW_selector_base_conventions = [
   {
-    match: (el) => playwright.selector(el),
+    match: (el) => finder(el),
   },
 ];
