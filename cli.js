@@ -30,16 +30,6 @@ for (const file of fs.readdirSync(packageExamplesPath)) {
   }
 }
 
-// Create or modify /.vscode/settings.json
-const vscodeDir = path.join(process.cwd(), '.vscode');
-const settingsFile = path.join(vscodeDir, 'settings.json');
-
-if (!fs.existsSync(vscodeDir)) fs.mkdirSync(vscodeDir);
-const settings = fs.existsSync(settingsFile) ? JSON.parse(fs.readFileSync(settingsFile, 'utf8')) : {};
-if (!settings['playwright.env']) settings['playwright.env'] = { 'PWDEBUG': 'console' };
-fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
-console.log(`Updated settings at: ${settingsFile}`);
-
 // Create or modify ./tests/package.json
 const testsDir = path.join(process.cwd(), 'tests');
 const testsPackageFile = path.join(testsDir, 'package.json');
