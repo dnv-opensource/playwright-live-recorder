@@ -19,7 +19,8 @@ export module PlaywrightLiveRecorder {
     export const defaultConfig: PlaywrightLiveRecorderConfig = {
         recorder: {
             path: './PW_selectorConventions.js',
-            basepath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js'
+            basepath: './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js',
+            onNavigate_assertUrl: false,
         },
         pageObjectModel: {
             enabled: true,

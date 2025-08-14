@@ -96,6 +96,8 @@ export type PlaywrightLiveRecorderConfig_recorder = {
     path: string,
     /** @default './node_modules/@dnvgl/playwright-live-recorder/dist/browser/PW_selectorConventions.js' */
     basepath: string,
+    /** @default false */
+    onNavigate_assertUrl: boolean,
 }
 
 export type PlaywrightLiveRecorderConfig_diagnostic = {
